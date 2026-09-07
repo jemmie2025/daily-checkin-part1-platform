@@ -753,8 +753,8 @@
     },
     {
       "path": "scripts/scan_secrets.py",
-      "sha256": "a9f9885e3a4099df21e185bf41ac14f6ddc59e2a1e98dcd08c4bc5ca72f19017",
-      "size_bytes": 4281
+      "sha256": "6a7d95cf7f3a885eefcec50c03323e4665fd50021940e7bd7c42abac60808425",
+      "size_bytes": 4322
     },
     {
       "path": "scripts/smoke_gateway.py",
@@ -833,8 +833,8 @@
     },
     {
       "path": "tests/test_vault_security.py",
-      "sha256": "74bd30e2037ee88ad053e74c4e10a8ba9c05eb09af0e38651e1ddba67ad9eb30",
-      "size_bytes": 11732
+      "sha256": "b60b28f11cfed30c0f73b70a04b1ba634b9c296ef23c99fe386233fb596dac93",
+      "size_bytes": 12257
     },
     {
       "path": "vault/auth/jwt-nomad-config.json",

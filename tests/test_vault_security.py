@@ -249,5 +249,16 @@ class SecretLeakGateTests(unittest.TestCase):
         self.assertTrue(all(synthetic not in finding for finding in findings))
 
 
+    def test_scanner_allows_k6_runtime_environment_reference(self) -> None:
+        content = "token: __ENV.CHECKIN_TEST_COMMAND_TOKEN"
+        self.assertEqual(scanner.scan_text(content, "fixture.js"), [])
+
+    def test_scanner_still_rejects_hardcoded_js_assignment(self) -> None:
+        synthetic = "hardcoded-" + "credential-value"
+        findings = scanner.scan_text("token: " + synthetic, "fixture.js")
+        self.assertTrue(findings)
+        self.assertTrue(all(synthetic not in finding for finding in findings))
+
+
 if __name__ == "__main__":
     unittest.main()

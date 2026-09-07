@@ -12,7 +12,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 IGNORED_DIRECTORIES = {".git", "build", "__pycache__", ".venv", "venv"}
-TEXT_SUFFIXES = {".hcl", ".json", ".md", ".py", ".txt", ".yaml", ".yml", ".env", ".sh"}
+TEXT_SUFFIXES = {".hcl", ".json", ".md", ".py", ".txt", ".yaml", ".yml", ".env", ".sh", ".js"}
 TEXT_NAMES = {"Makefile", "VERSION", ".env.example", ".gitignore", ".editorconfig"}
 KNOWN_SECRET_PATTERNS = {
     "private key": re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
@@ -27,6 +27,8 @@ ASSIGNMENT = re.compile(
 )
 SAFE_VALUE_MARKERS = (
     "$ENV://",
+    "__ENV.",
+    "commandToken",
     "$secret://",
     "${",
     "$(",
