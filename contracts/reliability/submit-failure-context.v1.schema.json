@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://acumen.internal/contracts/submit-failure-context.v1.schema.json",
+  "title": "Submit Failure Context v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "correlation_id",
+    "user_id",
+    "pod_id",
+    "cycle_date",
+    "checkin_type",
+    "failure_stage",
+    "error_code",
+    "raw_submission",
+    "mattermost_dm_channel_id"
+  ],
+  "properties": {
+    "correlation_id": {"type": "string", "minLength": 8, "maxLength": 128},
+    "user_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "pod_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "cycle_date": {"type": "string", "format": "date"},
+    "checkin_type": {"type": "string", "enum": ["SOD", "EOD", "ADHOC"]},
+    "failure_stage": {
+      "type": "string",
+      "enum": ["baserow_checkins_write", "mattermost_canonical_post", "event_dispatch"]
+    },
+    "error_code": {"type": "string", "minLength": 1, "maxLength": 128},
+    "raw_submission": {"type": "string", "minLength": 1, "maxLength": 65536},
+    "mattermost_dm_channel_id": {"type": "string", "minLength": 1, "maxLength": 128}
+  }
+}

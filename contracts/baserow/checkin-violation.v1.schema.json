@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://acumen.internal/contracts/checkin-violation.v1.schema.json",
+  "title": "checkin_violations logical record v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "violation_id",
+    "rule_id",
+    "rule_name",
+    "user_id",
+    "user_name",
+    "pod_id",
+    "cycle_date",
+    "checkin_type",
+    "sla_code",
+    "sla_due_at",
+    "detected_at",
+    "status",
+    "evidence_json",
+    "workflow_execution_id"
+  ],
+  "properties": {
+    "violation_id": {"type": "string", "minLength": 8, "maxLength": 300},
+    "rule_id": {"const": "PI-6"},
+    "rule_name": {"const": "EOD status update not submitted"},
+    "user_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "user_name": {"type": "string", "minLength": 1, "maxLength": 200},
+    "pod_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "cycle_date": {"type": "string", "format": "date"},
+    "checkin_type": {"const": "EOD"},
+    "sla_code": {"type": "string", "minLength": 1, "maxLength": 128},
+    "sla_due_at": {"type": "string", "format": "date-time"},
+    "detected_at": {"type": "string", "format": "date-time"},
+    "status": {"type": "string", "enum": ["open", "resolved", "waived"]},
+    "evidence_json": {"type": "string", "minLength": 2},
+    "workflow_execution_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "resolved_at": {"type": ["string", "null"], "format": "date-time"},
+    "resolved_by_checkin_id": {"type": ["string", "null"], "maxLength": 300},
+    "waiver_reason": {"type": ["string", "null"], "maxLength": 1000}
+  }
+}

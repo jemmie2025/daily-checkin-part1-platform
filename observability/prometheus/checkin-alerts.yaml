@@ -1,0 +1,71 @@
+groups:
+  - name: daily-checkin-slo-alerts
+    interval: 30s
+    rules:
+      - alert: CheckinOpenAvailabilityFastBurn
+        expr: checkin:open_success_ratio_5m < 0.986
+        for: 5m
+        labels: {severity: critical, service: daily-checkin, owner: platform-gateway}
+        annotations:
+          summary: Daily Check-in open availability is burning error budget rapidly
+          runbook_url: docs/runbooks/incident-response.md#open-handler
+      - alert: CheckinOpenLatencyFastBurn
+        expr: checkin:open_under_2s_ratio_5m < 0.86
+        for: 5m
+        labels: {severity: critical, service: daily-checkin, owner: platform-gateway}
+        annotations:
+          summary: Daily Check-in open latency exceeds the two-second contract
+          runbook_url: docs/runbooks/incident-response.md#open-handler
+      - alert: CheckinSubmissionDurabilityBreach
+        expr: checkin:submission_durable_ratio_30m < 1
+        for: 2m
+        labels: {severity: critical, service: daily-checkin, owner: platform-operations}
+        annotations:
+          summary: A submission is neither stored nor durably captured
+          runbook_url: docs/runbooks/incident-response.md#submission-durability
+      - alert: CheckinComplianceWorkerStalled
+        expr: time() - checkin_compliance_last_success_timestamp_seconds{workflow="compliance-v1"} > 600
+        for: 5m
+        labels: {severity: critical, service: daily-checkin, owner: compliance-automation}
+        annotations:
+          summary: Compliance evaluation has not completed within two schedule windows
+          runbook_url: docs/runbooks/compliance-operations.md
+      - alert: CheckinAnalyticsIngestionLag
+        expr: histogram_quantile(0.95, sum by (le) (rate(checkin_event_ingestion_lag_seconds_bucket[15m]))) > 300
+        for: 15m
+        labels: {severity: warning, service: daily-checkin, owner: data-platform}
+        annotations:
+          summary: Check-in analytics ingestion p95 lag is over five minutes
+          runbook_url: docs/runbooks/analytics-deployment.md
+
+  - name: daily-checkin-operational-alerts
+    interval: 30s
+    rules:
+      - alert: CheckinDlqBacklogHigh
+        expr: sum(checkin_dlq_records{status="pending"}) > 10
+        for: 10m
+        labels: {severity: warning, service: daily-checkin, owner: platform-operations}
+        annotations:
+          summary: Daily Check-in pending DLQ backlog exceeds ten rows
+          runbook_url: docs/runbooks/dlq-operations.md
+      - alert: CheckinDlqOldestPendingTooOld
+        expr: max(checkin_dlq_oldest_pending_age_seconds) > 3600
+        for: 5m
+        labels: {severity: critical, service: daily-checkin, owner: platform-operations}
+        annotations:
+          summary: A Daily Check-in DLQ row has remained pending for more than one hour
+          runbook_url: docs/runbooks/dlq-operations.md
+      - alert: CheckinEventIdConflict
+        expr: increase(checkin_event_ingestion_total{result="conflict"}[15m]) > 0
+        for: 0m
+        labels: {severity: critical, service: daily-checkin, owner: data-platform}
+        annotations:
+          summary: An event ID was reused with a different payload
+          runbook_url: docs/runbooks/incident-response.md#event-id-conflict
+      - alert: CheckinVaultSecretNearRotationLimit
+        expr: max by (secret_object) (checkin_vault_secret_age_days) > 80
+        for: 1h
+        labels: {severity: warning, service: daily-checkin, owner: security-platform}
+        annotations:
+          summary: A Daily Check-in static credential is nearing its 90-day limit
+          runbook_url: docs/runbooks/vault-deployment-and-rotation.md

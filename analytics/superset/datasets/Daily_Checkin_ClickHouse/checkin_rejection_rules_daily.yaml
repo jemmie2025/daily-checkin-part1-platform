@@ -1,0 +1,24 @@
+table_name: checkin_rejection_rules_reporting
+schema: checkin_analytics
+database_uuid: 9bb1d984-e169-4454-9842-81d876cc1943
+main_dttm_col: cycle_date
+description: Rejection counts by stable FMT rule identifier.
+cache_timeout: 300
+columns:
+  - column_name: cycle_date
+    is_dttm: true
+    type: DATE
+  - column_name: pod_id
+    type: STRING
+  - column_name: checkin_type
+    type: STRING
+  - column_name: rule_id
+    type: STRING
+  - column_name: rejection_count
+    type: BIGINT
+metrics:
+  - metric_name: rejection_total
+    expression: SUM(rejection_count)
+    metric_type: sum
+uuid: 42845d91-fc40-4a10-be5c-bb14e70c59fc
+version: 1.0.0

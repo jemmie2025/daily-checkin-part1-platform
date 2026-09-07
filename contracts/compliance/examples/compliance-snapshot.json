@@ -1,0 +1,27 @@
+{
+  "cycle_date": "2026-09-04",
+  "now": "2026-09-04T15:00:00Z",
+  "roster_source_version": "compliance-source-2026-09-04T06:00:00Z",
+  "roster": [
+    {
+      "user_id": "mm-user-1003",
+      "user_name": "Example User",
+      "pod_id": "pod-nails-squad",
+      "timezone": "Africa/Lagos",
+      "active": true,
+      "active_from": "2026-01-01",
+      "active_until": null,
+      "mattermost_dm_channel_id": "dm-checkin-test-user",
+      "pod_lead_channel_id": "channel-nails-leads"
+    }
+  ],
+  "sla_rules": [
+    {"checkin_type": "SOD", "sla_code": "NAILS-POD-SOD", "local_due_time": "09:00"},
+    {"checkin_type": "EOD", "sla_code": "NAILS-POD-EOD", "local_due_time": "17:00"}
+  ],
+  "leave_records": [],
+  "holidays": [],
+  "checkins": [],
+  "violations": [],
+  "existing_action_ids": []
+}

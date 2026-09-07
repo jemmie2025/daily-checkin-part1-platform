@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://acumen.internal/contracts/expected-checkin.v1.schema.json",
+  "title": "Expected Check-in v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "expectation_id",
+    "user_id",
+    "user_name",
+    "pod_id",
+    "timezone",
+    "cycle_date",
+    "checkin_type",
+    "sla_code",
+    "sla_due_at",
+    "attendance_state",
+    "roster_source_version"
+  ],
+  "properties": {
+    "expectation_id": {"type": "string", "minLength": 8, "maxLength": 300},
+    "user_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "user_name": {"type": "string", "minLength": 1, "maxLength": 200},
+    "pod_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "timezone": {"type": "string", "minLength": 1, "maxLength": 100},
+    "cycle_date": {"type": "string", "format": "date"},
+    "checkin_type": {"type": "string", "enum": ["SOD", "EOD"]},
+    "sla_code": {"type": "string", "minLength": 1, "maxLength": 128},
+    "sla_due_at": {"type": "string", "format": "date-time"},
+    "attendance_state": {
+      "type": "string",
+      "enum": ["expected", "approved_leave", "holiday", "inactive"]
+    },
+    "roster_source_version": {"type": "string", "minLength": 1, "maxLength": 128}
+  }
+}

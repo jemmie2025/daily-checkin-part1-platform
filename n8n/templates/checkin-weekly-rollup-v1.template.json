@@ -1,0 +1,81 @@
+{
+  "name": "Daily Check-in — Weekly Rollup v1",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {"field": "weeks", "weeksInterval": 1, "triggerAtDay": [1], "triggerAtHour": 9}
+          ]
+        }
+      },
+      "id": "d9885743-bad8-4ad1-a276-50d334aa8837",
+      "name": "Every Monday",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-520, 0]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.CHECKIN_WEEKLY_SNAPSHOT_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {"parameters": [{"name": "Authorization", "value": "={{ 'Bearer ' + $env.CHECKIN_ROSTER_READ_TOKEN }}"}]},
+        "options": {"timeout": 10000}
+      },
+      "id": "61bc31e9-1926-4274-b9a1-69840cc34cd6",
+      "name": "Fetch Weekly Snapshot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-280, 0],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {"jsCode": "@code:weekly-rollup.js"},
+      "id": "41f60e0f-8cb2-43c1-8c03-0850edb68d8b",
+      "name": "Calculate Weekly Rollups",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-40, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.MATTERMOST_URL + '/api/v4/posts' }}",
+        "sendHeaders": true,
+        "headerParameters": {"parameters": [{"name": "Authorization", "value": "={{ 'Bearer ' + $env.CHECKIN_MATTERMOST_COMPLIANCE_BOT_TOKEN }}"}]},
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({channel_id: $json.channel_id, message: $json.message, props: {checkin_rollup_id: $json.rollup_id}}) }}",
+        "options": {"timeout": 10000}
+      },
+      "id": "473a66da-0966-4ea7-9237-c54069af42c6",
+      "name": "Post Pod Rollup",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [200, 0],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    }
+  ],
+  "connections": {
+    "Every Monday": {"main": [[{"node": "Fetch Weekly Snapshot", "type": "main", "index": 0}]]},
+    "Fetch Weekly Snapshot": {"main": [[{"node": "Calculate Weekly Rollups", "type": "main", "index": 0}]]},
+    "Calculate Weekly Rollups": {"main": [[{"node": "Post Pod Rollup", "type": "main", "index": 0}]]}
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false,
+    "timezone": "UTC"
+  },
+  "active": false,
+  "versionId": "4588aeaf-3c79-4fbf-855e-ff01c25d0eaf",
+  "meta": {"templateCredsSetupCompleted": true},
+  "tags": [{"name": "daily-checkin"}, {"name": "part-1"}, {"name": "weekly-rollup"}]
+}

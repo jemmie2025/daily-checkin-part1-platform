@@ -1,0 +1,301 @@
+{
+  "name": "Daily Check-in — Compliance v1",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "4d06cab5-df67-45d3-ad6a-859e334fb61c",
+      "name": "Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-1040, 0]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.CHECKIN_COMPLIANCE_SNAPSHOT_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.CHECKIN_ROSTER_READ_TOKEN }}"
+            },
+            {
+              "name": "X-Correlation-ID",
+              "value": "={{ 'compliance-' + $execution.id }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "41e9bffe-414d-442c-a907-c445fd7c1e80",
+      "name": "Fetch Compliance Snapshot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-800, 0],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "jsCode": "@code:expectation-builder.js"
+      },
+      "id": "97dcd434-8fc3-405f-98f4-29e06630fb44",
+      "name": "Build Expectations",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-560, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "@code:compliance-planner.js"
+      },
+      "id": "4a750b6e-fb80-454a-80e8-1b28d210d7d5",
+      "name": "Plan Compliance Actions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-320, 0]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2},
+                "conditions": [
+                  {"leftValue": "={{ $json.action_type }}", "rightValue": "nudge", "operator": {"type": "string", "operation": "equals"}}
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "nudge"
+            },
+            {
+              "conditions": {
+                "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2},
+                "conditions": [
+                  {"leftValue": "={{ $json.action_type }}", "rightValue": "upsert_violation", "operator": {"type": "string", "operation": "equals"}}
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "upsert"
+            },
+            {
+              "conditions": {
+                "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2},
+                "conditions": [
+                  {"leftValue": "={{ $json.action_type }}", "rightValue": "resolve_violation", "operator": {"type": "string", "operation": "equals"}}
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "resolve"
+            },
+            {
+              "conditions": {
+                "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2},
+                "conditions": [
+                  {"leftValue": "={{ $json.action_type }}", "rightValue": "escalation_digest", "operator": {"type": "string", "operation": "equals"}}
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "escalate"
+            }
+          ]
+        },
+        "options": {"fallbackOutput": "extra"}
+      },
+      "id": "a9507cd8-d7c5-49ba-89ec-4c73d3ca84d6",
+      "name": "Route Action",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [-80, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.MATTERMOST_URL + '/api/v4/posts' }}",
+        "sendHeaders": true,
+        "headerParameters": {"parameters": [{"name": "Authorization", "value": "={{ 'Bearer ' + $env.CHECKIN_MATTERMOST_COMPLIANCE_BOT_TOKEN }}"}]},
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({channel_id: $json.channel_id, message: $json.message, props: {checkin_action_id: $json.action_id}}) }}",
+        "options": {"timeout": 10000}
+      },
+      "id": "df9dfdc3-8c79-42ab-af67-634f932a31a0",
+      "name": "Send Nudge",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [200, -320],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.BASEROW_API_URL + '/database/rows/table/' + $env.BASEROW_VIOLATIONS_TABLE_ID + '/?user_field_names=true&filter__field_' + $env.BASEROW_VIOLATION_ID_FIELD_ID + '__equal=' + encodeURIComponent($json.record.violation_id) }}",
+        "sendHeaders": true,
+        "headerParameters": {"parameters": [{"name": "Authorization", "value": "={{ 'Token ' + $env.CHECKIN_BASEROW_VIOLATIONS_TOKEN }}"}]},
+        "options": {"timeout": 10000}
+      },
+      "id": "d41610b8-a1b6-4168-8500-79a0f1f44734",
+      "name": "Find Existing Violation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [200, -120]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2},
+          "conditions": [
+            {"leftValue": "={{ $json.count }}", "rightValue": 0, "operator": {"type": "number", "operation": "equals"}}
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "af996954-b074-44e0-bd58-a3e7ecc354cb",
+      "name": "Violation Missing",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [440, -120]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BASEROW_API_URL + '/database/rows/table/' + $env.BASEROW_VIOLATIONS_TABLE_ID + '/?user_field_names=true' }}",
+        "sendHeaders": true,
+        "headerParameters": {"parameters": [{"name": "Authorization", "value": "={{ 'Token ' + $env.CHECKIN_BASEROW_VIOLATIONS_TOKEN }}"}]},
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($('Plan Compliance Actions').item.json.record) }}",
+        "options": {"timeout": 10000}
+      },
+      "id": "f4684860-d73c-49e0-8e3e-bf399eaa5cb2",
+      "name": "Create PI-6 Violation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, -180],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.BASEROW_API_URL + '/database/rows/table/' + $env.BASEROW_VIOLATIONS_TABLE_ID + '/?user_field_names=true&filter__field_' + $env.BASEROW_VIOLATION_ID_FIELD_ID + '__equal=' + encodeURIComponent($json.violation_id) }}",
+        "sendHeaders": true,
+        "headerParameters": {"parameters": [{"name": "Authorization", "value": "={{ 'Token ' + $env.CHECKIN_BASEROW_VIOLATIONS_TOKEN }}"}]},
+        "options": {"timeout": 10000}
+      },
+      "id": "71e39595-339d-470e-af38-c923e2d5ef59",
+      "name": "Find Violation to Resolve",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [200, 100]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.BASEROW_API_URL + '/database/rows/table/' + $env.BASEROW_VIOLATIONS_TABLE_ID + '/' + $json.results[0].id + '/?user_field_names=true' }}",
+        "sendHeaders": true,
+        "headerParameters": {"parameters": [{"name": "Authorization", "value": "={{ 'Token ' + $env.CHECKIN_BASEROW_VIOLATIONS_TOKEN }}"}]},
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({status: 'resolved', resolved_at: $('Plan Compliance Actions').item.json.resolved_at, resolved_by_checkin_id: $('Plan Compliance Actions').item.json.resolved_by_checkin_id}) }}",
+        "options": {"timeout": 10000}
+      },
+      "id": "4ec65dcc-b282-43bc-8401-90824ee4f156",
+      "name": "Resolve PI-6 Violation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 100],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.MATTERMOST_URL + '/api/v4/posts' }}",
+        "sendHeaders": true,
+        "headerParameters": {"parameters": [{"name": "Authorization", "value": "={{ 'Bearer ' + $env.CHECKIN_MATTERMOST_COMPLIANCE_BOT_TOKEN }}"}]},
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({channel_id: $json.channel_id, message: $json.message, props: {checkin_action_id: $json.action_id}}) }}",
+        "options": {"timeout": 10000}
+      },
+      "id": "d0a8302a-b964-43f8-a75f-beb93b2bc5b5",
+      "name": "Send Escalation Digest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [200, 320],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "jsCode": "@code:commit-action.js"
+      },
+      "id": "1b65eafd-29fb-4f09-99bf-f645c8ae4e4f",
+      "name": "Commit Action ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [920, 0]
+    }
+  ],
+  "connections": {
+    "Every 5 Minutes": {"main": [[{"node": "Fetch Compliance Snapshot", "type": "main", "index": 0}]]},
+    "Fetch Compliance Snapshot": {"main": [[{"node": "Build Expectations", "type": "main", "index": 0}]]},
+    "Build Expectations": {"main": [[{"node": "Plan Compliance Actions", "type": "main", "index": 0}]]},
+    "Plan Compliance Actions": {"main": [[{"node": "Route Action", "type": "main", "index": 0}]]},
+    "Route Action": {"main": [
+      [{"node": "Send Nudge", "type": "main", "index": 0}],
+      [{"node": "Find Existing Violation", "type": "main", "index": 0}],
+      [{"node": "Find Violation to Resolve", "type": "main", "index": 0}],
+      [{"node": "Send Escalation Digest", "type": "main", "index": 0}]
+    ]},
+    "Send Nudge": {"main": [[{"node": "Commit Action ID", "type": "main", "index": 0}]]},
+    "Find Existing Violation": {"main": [[{"node": "Violation Missing", "type": "main", "index": 0}]]},
+    "Violation Missing": {"main": [
+      [{"node": "Create PI-6 Violation", "type": "main", "index": 0}],
+      [{"node": "Commit Action ID", "type": "main", "index": 0}]
+    ]},
+    "Create PI-6 Violation": {"main": [[{"node": "Commit Action ID", "type": "main", "index": 0}]]},
+    "Find Violation to Resolve": {"main": [[{"node": "Resolve PI-6 Violation", "type": "main", "index": 0}]]},
+    "Resolve PI-6 Violation": {"main": [[{"node": "Commit Action ID", "type": "main", "index": 0}]]},
+    "Send Escalation Digest": {"main": [[{"node": "Commit Action ID", "type": "main", "index": 0}]]}
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false,
+    "timezone": "UTC"
+  },
+  "active": false,
+  "versionId": "caf642c6-34a7-4ffb-916a-22e33b7eb56b",
+  "meta": {"templateCredsSetupCompleted": true},
+  "tags": [{"name": "daily-checkin"}, {"name": "part-1"}, {"name": "compliance"}]
+}

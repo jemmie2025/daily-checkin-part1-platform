@@ -1,0 +1,30 @@
+env:
+  contexts:
+    - name: daily-checkin-staging
+      urls:
+        - ${CHECKIN_GATEWAY_URL}
+      includePaths:
+        - ${CHECKIN_GATEWAY_URL}/webhook/checkin/.*
+      excludePaths: []
+  parameters:
+    failOnError: true
+    failOnWarning: false
+    progressToStdout: true
+
+jobs:
+  - type: passiveScan-config
+    parameters:
+      maxAlertsPerRule: 10
+      scanOnlyInScope: true
+  - type: spider
+    parameters:
+      context: daily-checkin-staging
+      maxDuration: 2
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 5
+  - type: report
+    parameters:
+      template: traditional-json
+      reportDir: evidence/private
+      reportFile: zap-checkin-staging.json

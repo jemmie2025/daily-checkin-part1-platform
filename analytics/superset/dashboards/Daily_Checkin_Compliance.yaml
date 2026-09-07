@@ -1,0 +1,16 @@
+dashboard_title: Daily Check-in Compliance
+description: Privacy-minimized compliance, quality, and latency dashboard for Task 5585.
+slug: daily_checkin_compliance_v1
+published: false
+position: '{"DASHBOARD_VERSION_KEY":"v2","ROOT_ID":{"id":"ROOT_ID","type":"ROOT","children":["GRID_ID"]},"GRID_ID":{"id":"GRID_ID","type":"GRID","parents":["ROOT_ID"],"children":["ROW-1","ROW-2","ROW-3"]},"ROW-1":{"id":"ROW-1","type":"ROW","parents":["ROOT_ID","GRID_ID"],"children":["CHART-1","CHART-2"]},"ROW-2":{"id":"ROW-2","type":"ROW","parents":["ROOT_ID","GRID_ID"],"children":["CHART-3","CHART-4"]},"ROW-3":{"id":"ROW-3","type":"ROW","parents":["ROOT_ID","GRID_ID"],"children":["CHART-5","CHART-6"]},"CHART-1":{"id":"CHART-1","type":"CHART","parents":["ROOT_ID","GRID_ID","ROW-1"],"children":[],"meta":{"chartId":1,"sliceName":"Submission Rate","uuid":"e1113244-6d79-45f1-b7ee-721088eef6c7","width":6,"height":20}},"CHART-2":{"id":"CHART-2","type":"CHART","parents":["ROOT_ID","GRID_ID","ROW-1"],"children":[],"meta":{"chartId":2,"sliceName":"Proof Attachment Rate","uuid":"fe60317a-7fb2-4059-85c5-7ee143f468a9","width":6,"height":20}},"CHART-3":{"id":"CHART-3","type":"CHART","parents":["ROOT_ID","GRID_ID","ROW-2"],"children":[],"meta":{"chartId":3,"sliceName":"On-time vs Late by Pod","uuid":"8a86c6ce-820d-4f5b-94d4-e5c527ec5b66","width":6,"height":30}},"CHART-4":{"id":"CHART-4","type":"CHART","parents":["ROOT_ID","GRID_ID","ROW-2"],"children":[],"meta":{"chartId":4,"sliceName":"Median Submit Latency","uuid":"9dc245a6-ab23-4656-a751-ce9d7fb11ab8","width":6,"height":30}},"CHART-5":{"id":"CHART-5","type":"CHART","parents":["ROOT_ID","GRID_ID","ROW-3"],"children":[],"meta":{"chartId":5,"sliceName":"Top Rejection Rules","uuid":"77d7c7be-0488-4492-88c8-5127d4bcb169","width":6,"height":30}},"CHART-6":{"id":"CHART-6","type":"CHART","parents":["ROOT_ID","GRID_ID","ROW-3"],"children":[],"meta":{"chartId":6,"sliceName":"Blocked Task Trend","uuid":"d149b67d-e1a0-4207-ad2f-1e85a39198a2","width":6,"height":30}}}'
+css: ''
+metadata: '{"color_scheme":"supersetColors","default_filters":"{}","expanded_slices":{},"refresh_frequency":0,"timed_refresh_immune_slices":[],"native_filter_configuration":[{"id":"NATIVE_FILTER-pod","name":"Pod","filterType":"filter_select","targets":[{"datasetUuid":"bbf089b7-d3b3-46f2-9515-f964278cdd2b","column":{"name":"pod_id"}}],"defaultDataMask":{"filterState":{},"extraFormData":{}},"controlValues":{"enableEmptyFilter":true,"inverseSelection":false,"multiSelect":true,"searchAllOptions":true}},{"id":"NATIVE_FILTER-type","name":"Check-in Type","filterType":"filter_select","targets":[{"datasetUuid":"bbf089b7-d3b3-46f2-9515-f964278cdd2b","column":{"name":"checkin_type"}}],"defaultDataMask":{"filterState":{},"extraFormData":{}},"controlValues":{"enableEmptyFilter":true,"inverseSelection":false,"multiSelect":true,"searchAllOptions":true}}]}'
+charts:
+  - e1113244-6d79-45f1-b7ee-721088eef6c7
+  - 8a86c6ce-820d-4f5b-94d4-e5c527ec5b66
+  - 9dc245a6-ab23-4656-a751-ce9d7fb11ab8
+  - 77d7c7be-0488-4492-88c8-5127d4bcb169
+  - fe60317a-7fb2-4059-85c5-7ee143f468a9
+  - d149b67d-e1a0-4207-ad2f-1e85a39198a2
+uuid: 849430f4-d4cd-4e16-bbdd-df863727e6d9
+version: 1.0.0

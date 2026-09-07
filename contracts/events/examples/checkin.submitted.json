@@ -1,0 +1,32 @@
+{
+  "event_id": "b0ca295f-0338-458c-bacc-b42d3dc56c63",
+  "event_name": "checkin.submitted",
+  "event_version": 1,
+  "occurred_at": "2026-09-04T16:02:11Z",
+  "correlation_id": "ci-20260904-01HV7DKR",
+  "source": "n8n_submit_handler",
+  "user": {
+    "user_id": "mm-user-1001"
+  },
+  "pod": {
+    "pod_id": "pod-nails-squad"
+  },
+  "cycle": {
+    "cycle_date": "2026-09-04",
+    "checkin_type": "EOD",
+    "sla_code": "NAILS-POD-EOD"
+  },
+  "dialog_version": "checkin_v1",
+  "outcome": {
+    "latency_ms": 426,
+    "sla_status": "on_time",
+    "task_count": 3,
+    "done_count": 2,
+    "blocked_count": 1,
+    "has_proof": true
+  },
+  "trace": {
+    "request_id": "req-01HV7DKR50T4",
+    "execution_id": "n8n-58121"
+  }
+}

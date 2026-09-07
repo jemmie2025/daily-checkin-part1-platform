@@ -1,0 +1,49 @@
+schema_version: 1
+service: daily-checkin
+window_days: 30
+
+slos:
+  - id: open_availability
+    description: Authenticated open requests return HTTP 200 and render a dialog.
+    objective_percent: 99.9
+    indicator: checkin:open_success_ratio_5m
+    critical_alert: CheckinOpenAvailabilityFastBurn
+
+  - id: open_latency
+    description: Successful open requests complete inside the two-second contract.
+    objective_percent: 99.0
+    indicator: checkin:open_under_2s_ratio_5m
+    critical_alert: CheckinOpenLatencyFastBurn
+
+  - id: submission_durability
+    description: Accepted submissions are stored or durably captured for replay.
+    objective_percent: 100.0
+    indicator: checkin:submission_durable_ratio_30m
+    critical_alert: CheckinSubmissionDurabilityBreach
+
+  - id: compliance_timeliness
+    description: PI-6 breaches are evaluated no later than five minutes after SLA.
+    objective_percent: 99.9
+    indicator: checkin:compliance_on_time_ratio_30m
+    critical_alert: CheckinComplianceWorkerStalled
+
+  - id: analytics_freshness
+    description: Accepted events appear in ClickHouse within five minutes.
+    objective_percent: 99.0
+    indicator: checkin:analytics_fresh_ratio_15m
+    critical_alert: CheckinAnalyticsIngestionLag
+
+error_budget_policy:
+  fast_burn:
+    short_window: 5m
+    long_window: 1h
+    burn_rate: 14.4
+  slow_burn:
+    short_window: 30m
+    long_window: 6h
+    burn_rate: 6
+  freeze_rollout_on:
+    - submission_durability_below_100_percent
+    - open_fast_burn
+    - unresolved_security_incident
+    - failed_restore_drill

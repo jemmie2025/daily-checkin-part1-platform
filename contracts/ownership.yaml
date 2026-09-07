@@ -1,0 +1,60 @@
+contract_version: 1
+task: 5585
+integration_style: contract_first
+
+part_1_platform:
+  owns:
+    - apisix_gateway
+    - vault_secret_delivery
+    - compliance_worker
+    - checkin_violations_writes
+    - submit_error_workflow
+    - checkin_dlq_writes
+    - clickhouse_ingestion
+    - superset_dashboard
+    - observability
+    - production_hardening
+  must_not:
+    - write_checkins
+    - open_mattermost_dialogs
+    - normalize_or_validate_task_markdown
+    - create_canonical_pod_posts
+
+part_2_application:
+  owns:
+    - mattermost_ci_command_and_dialog
+    - n8n_open_handler
+    - n8n_submit_handler
+    - fmt_1_through_fmt_8
+    - checkins_writes
+    - canonical_threaded_posts
+  must_not:
+    - write_checkin_violations
+    - write_checkin_dlq
+    - administer_apisix_or_vault
+    - write_directly_to_clickhouse_tables
+
+published_interfaces:
+  from_part_1:
+    - contracts/events/checkin-event.v1.schema.json
+    - contracts/baserow/checkin-violation.v1.schema.json
+    - contracts/baserow/checkin-dlq.v1.schema.json
+    - contracts/compliance/expected-checkin.v1.schema.json
+    - contracts/compliance/compliance-snapshot.v1.schema.json
+    - contracts/reliability/submit-failure-context.v1.schema.json
+    - contracts/reliability/replay-request.v1.schema.json
+    - contracts/reliability/replay-response.v1.schema.json
+    - vault/secret-inventory.json
+    - config/vault.security.example.yaml
+  required_from_part_2:
+    - schema_valid_checkin_events
+    - immutable_correlation_id
+    - source_execution_id_on_failures
+    - baserow_checkins_table_identifier
+    - saved_submit_failure_context_v1
+    - idempotent_replay_endpoint_v1
+
+change_policy:
+  backward_compatible_changes: additive_optional_fields_only
+  breaking_change: increment_contract_version
+  consumer_validation: required_before_rollout

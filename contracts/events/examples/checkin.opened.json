@@ -1,0 +1,26 @@
+{
+  "event_id": "4e7cc2a0-cbf8-4f36-8620-d98ff447fba2",
+  "event_name": "checkin.opened",
+  "event_version": 1,
+  "occurred_at": "2026-09-04T07:59:58Z",
+  "correlation_id": "ci-20260904-01HV7D7P",
+  "source": "apisix_telemetry",
+  "user": {
+    "user_id": "mm-user-1001"
+  },
+  "pod": {
+    "pod_id": "pod-nails-squad"
+  },
+  "cycle": {
+    "cycle_date": "2026-09-04",
+    "checkin_type": "SOD",
+    "sla_code": "NAILS-POD-SOD"
+  },
+  "dialog_version": "checkin_v1",
+  "outcome": {
+    "latency_ms": 183
+  },
+  "trace": {
+    "request_id": "req-01HV7D7P1M8G"
+  }
+}

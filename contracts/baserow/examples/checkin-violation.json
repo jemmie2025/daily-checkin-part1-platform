@@ -1,0 +1,19 @@
+{
+  "violation_id": "viol_cde83223a803253fe810ec0183da46c8",
+  "rule_id": "PI-6",
+  "rule_name": "EOD status update not submitted",
+  "user_id": "mm-user-1003",
+  "user_name": "Example User",
+  "pod_id": "pod-nails-squad",
+  "cycle_date": "2026-09-04",
+  "checkin_type": "EOD",
+  "sla_code": "NAILS-POD-EOD",
+  "sla_due_at": "2026-09-04T16:00:00Z",
+  "detected_at": "2026-09-04T16:01:00Z",
+  "status": "open",
+  "evidence_json": "{\"expected\":true,\"accepted_checkin_found\":false}",
+  "workflow_execution_id": "n8n-compliance-7712",
+  "resolved_at": null,
+  "resolved_by_checkin_id": null,
+  "waiver_reason": null
+}

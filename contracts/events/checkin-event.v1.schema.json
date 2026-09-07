@@ -1,0 +1,262 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://acumen.internal/contracts/checkin-event.v1.schema.json",
+  "title": "Daily Check-in Telemetry Event v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "event_name",
+    "event_version",
+    "occurred_at",
+    "correlation_id",
+    "source",
+    "user",
+    "pod",
+    "cycle",
+    "dialog_version",
+    "outcome",
+    "trace"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "event_name": {
+      "type": "string",
+      "enum": [
+        "checkin.opened",
+        "checkin.submitted",
+        "checkin.rejected",
+        "checkin.cancelled"
+      ]
+    },
+    "event_version": {
+      "const": 1
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "correlation_id": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "apisix_telemetry",
+        "n8n_submit_handler"
+      ]
+    },
+    "user": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["user_id"],
+      "properties": {
+        "user_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "pod": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pod_id"],
+      "properties": {
+        "pod_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "cycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cycle_date", "checkin_type", "sla_code"],
+      "properties": {
+        "cycle_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "checkin_type": {
+          "type": "string",
+          "enum": ["SOD", "EOD", "ADHOC"]
+        },
+        "sla_code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "dialog_version": {
+      "const": "checkin_v1"
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["latency_ms"],
+      "properties": {
+        "latency_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sla_status": {
+          "type": "string",
+          "enum": ["on_time", "late"]
+        },
+        "task_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20
+        },
+        "done_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20
+        },
+        "blocked_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20
+        },
+        "has_proof": {
+          "type": "boolean"
+        },
+        "rule_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^(FMT-[1-8]|PI-[0-9]+)$"
+          }
+        }
+      }
+    },
+    "trace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["request_id"],
+      "properties": {
+        "request_id": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 128
+        },
+        "execution_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "event_name": {"const": "checkin.opened"}
+        }
+      },
+      "then": {
+        "properties": {
+          "source": {"const": "apisix_telemetry"},
+          "outcome": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["latency_ms"],
+            "properties": {
+              "latency_ms": {"type": "integer", "minimum": 0}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_name": {"const": "checkin.submitted"}
+        }
+      },
+      "then": {
+        "properties": {
+          "source": {"const": "n8n_submit_handler"},
+          "outcome": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "latency_ms",
+              "sla_status",
+              "task_count",
+              "done_count",
+              "blocked_count",
+              "has_proof"
+            ],
+            "properties": {
+              "latency_ms": {"type": "integer", "minimum": 0},
+              "sla_status": {"type": "string", "enum": ["on_time", "late"]},
+              "task_count": {"type": "integer", "minimum": 0, "maximum": 20},
+              "done_count": {"type": "integer", "minimum": 0, "maximum": 20},
+              "blocked_count": {"type": "integer", "minimum": 0, "maximum": 20},
+              "has_proof": {"type": "boolean"}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_name": {"const": "checkin.rejected"}
+        }
+      },
+      "then": {
+        "properties": {
+          "source": {"const": "n8n_submit_handler"},
+          "outcome": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["latency_ms", "rule_ids"],
+            "properties": {
+              "latency_ms": {"type": "integer", "minimum": 0},
+              "rule_ids": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {"type": "string", "pattern": "^(FMT-[1-8]|PI-[0-9]+)$"}
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_name": {"const": "checkin.cancelled"}
+        }
+      },
+      "then": {
+        "properties": {
+          "source": {"const": "n8n_submit_handler"},
+          "outcome": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["latency_ms"],
+            "properties": {
+              "latency_ms": {"type": "integer", "minimum": 0}
+            }
+          }
+        }
+      }
+    }
+  ]
+}

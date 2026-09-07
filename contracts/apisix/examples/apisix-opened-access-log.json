@@ -1,0 +1,16 @@
+{
+  "schema_version": "1",
+  "logged_at": "2026-09-04T08:00:00+00:00",
+  "route_id": "daily-checkin-open-v1",
+  "request_method": "POST",
+  "status": "200",
+  "upstream_status": "200",
+  "latency_seconds": "0.183",
+  "correlation_id": "4e7cc2a0-cbf8-4f36-8620-d98ff447fba2",
+  "user_id": "mm-user-1001",
+  "outcome": "opened",
+  "pod_id": "pod-nails-squad",
+  "cycle_date": "2026-09-04",
+  "checkin_type": "SOD",
+  "sla_code": "NAILS-POD-SOD"
+}

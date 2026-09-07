@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://acumen.internal/contracts/replay-response.v1.schema.json",
+  "title": "DLQ Replay Response v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "checkin_id", "correlation_id", "replay_key"],
+  "properties": {
+    "status": {"const": "resolved"},
+    "checkin_id": {"type": "string", "minLength": 8, "maxLength": 300},
+    "correlation_id": {"type": "string", "minLength": 8, "maxLength": 128},
+    "replay_key": {"type": "string", "minLength": 8, "maxLength": 300}
+  }
+}

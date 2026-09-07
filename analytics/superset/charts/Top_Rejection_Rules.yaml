@@ -1,0 +1,8 @@
+slice_name: Top Rejection Rules
+description: Most frequent FMT rule failures, used to drive help-text improvements.
+viz_type: echarts_timeseries_bar
+params: '{"adhoc_filters":[],"groupby":["rule_id"],"metrics":["rejection_total"],"orientation":"horizontal","row_limit":8,"sort_by_metric":true,"time_range":"Last month","viz_type":"echarts_timeseries_bar","x_axis":"rule_id"}'
+cache_timeout: 300
+dataset_uuid: 42845d91-fc40-4a10-be5c-bb14e70c59fc
+uuid: 77d7c7be-0488-4492-88c8-5127d4bcb169
+version: 1.0.0

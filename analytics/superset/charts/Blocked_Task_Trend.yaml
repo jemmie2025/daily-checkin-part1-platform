@@ -1,0 +1,8 @@
+slice_name: Blocked Task Trend
+description: Daily blocked-task count by pod.
+viz_type: echarts_timeseries_line
+params: '{"adhoc_filters":[],"groupby":["pod_id"],"metrics":["blocked_tasks"],"row_limit":10000,"show_legend":true,"time_grain_sqla":"P1D","time_range":"Last month","viz_type":"echarts_timeseries_line","x_axis":"cycle_date","y_axis_format":"SMART_NUMBER"}'
+cache_timeout: 300
+dataset_uuid: bbf089b7-d3b3-46f2-9515-f964278cdd2b
+uuid: d149b67d-e1a0-4207-ad2f-1e85a39198a2
+version: 1.0.0

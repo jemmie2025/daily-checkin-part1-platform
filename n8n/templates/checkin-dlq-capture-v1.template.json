@@ -1,0 +1,218 @@
+{
+  "name": "Daily Check-in — DLQ Capture and Reconciliation v1",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "9f0553c5-243b-4a2d-b8ba-362b0e4e8f5c",
+      "name": "Submit Workflow Failed",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [-960, -180]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.N8N_API_URL + '/api/v1/executions/' + $json.execution.id }}",
+        "sendHeaders": true,
+        "headerParameters": {"parameters": [{"name": "X-N8N-API-KEY", "value": "={{ $env.CHECKIN_N8N_EXECUTION_READ_TOKEN }}"}]},
+        "sendQuery": true,
+        "queryParameters": {"parameters": [{"name": "includeData", "value": "true"}]},
+        "options": {"timeout": 10000}
+      },
+      "id": "686a7bd3-f0cb-449e-a673-8118768e2902",
+      "name": "Fetch Failed Submit Execution",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-720, -180],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {"rule": {"interval": [{"field": "minutes", "minutesInterval": 5}]}},
+      "id": "75268ca0-df21-4a21-8625-706fc73d849f",
+      "name": "Reconcile Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-960, 180]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.N8N_API_URL + '/api/v1/executions' }}",
+        "sendHeaders": true,
+        "headerParameters": {"parameters": [{"name": "X-N8N-API-KEY", "value": "={{ $env.CHECKIN_N8N_EXECUTION_READ_TOKEN }}"}]},
+        "sendQuery": true,
+        "queryParameters": {"parameters": [
+          {"name": "status", "value": "error"},
+          {"name": "workflowId", "value": "={{ $env.N8N_SUBMIT_WORKFLOW_ID }}"},
+          {"name": "includeData", "value": "true"},
+          {"name": "limit", "value": "100"}
+        ]},
+        "options": {"timeout": 15000}
+      },
+      "id": "b208e04a-3c58-48cd-8f90-8df77e0a04be",
+      "name": "List Failed Submit Executions",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-720, 180],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {"jsCode": "@code:extract-failure-context.js"},
+      "id": "498c1558-545a-48dc-9f4f-71f4d559011b",
+      "name": "Extract Failure Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-480, 0]
+    },
+    {
+      "parameters": {"jsCode": "@code:dlq-builder.js"},
+      "id": "a0102c23-1575-4c29-9a13-b448ed7213ad",
+      "name": "Build DLQ Record",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-240, 0]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.BASEROW_API_URL + '/database/rows/table/' + $env.BASEROW_DLQ_TABLE_ID + '/?user_field_names=true&filter__field_' + $env.BASEROW_DLQ_ID_FIELD_ID + '__equal=' + encodeURIComponent($json.record.dlq_id) }}",
+        "sendHeaders": true,
+        "headerParameters": {"parameters": [{"name": "Authorization", "value": "={{ 'Token ' + $env.CHECKIN_BASEROW_DLQ_TOKEN }}"}]},
+        "options": {"timeout": 10000}
+      },
+      "id": "73552b87-8763-46a4-8959-778f4198255d",
+      "name": "Find Existing DLQ Row",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [20, 0],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2},
+          "conditions": [{"leftValue": "={{ $json.count }}", "rightValue": 0, "operator": {"type": "number", "operation": "equals"}}],
+          "combinator": "and"
+        }
+      },
+      "id": "5fc96af1-9cb2-4758-83d5-275aaef0390d",
+      "name": "DLQ Row Missing",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [260, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BASEROW_API_URL + '/database/rows/table/' + $env.BASEROW_DLQ_TABLE_ID + '/?user_field_names=true' }}",
+        "sendHeaders": true,
+        "headerParameters": {"parameters": [{"name": "Authorization", "value": "={{ 'Token ' + $env.CHECKIN_BASEROW_DLQ_TOKEN }}"}]},
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($('Build DLQ Record').item.json.record) }}",
+        "options": {"timeout": 10000}
+      },
+      "id": "01949dce-eef2-49b2-847c-32a44429ef3b",
+      "name": "Create DLQ Row",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, -100],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {"jsCode": "@code:dlq-dm-guard.js"},
+      "id": "80ad4fe6-e5c1-4744-a149-b66011546445",
+      "name": "Guard Duplicate DM",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [740, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.MATTERMOST_URL + '/api/v4/posts' }}",
+        "sendHeaders": true,
+        "headerParameters": {"parameters": [{"name": "Authorization", "value": "={{ 'Bearer ' + $env.CHECKIN_MATTERMOST_DLQ_BOT_TOKEN }}"}]},
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({channel_id: $json.dm_channel_id, message: $json.dm_message, props: {checkin_dlq_id: $json.record.dlq_id}}) }}",
+        "options": {"timeout": 10000}
+      },
+      "id": "25271896-e219-4b4c-a444-68ec4a1d8f30",
+      "name": "Send Verbatim Failure DM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [980, 0],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {"jsCode": "@code:commit-dlq-dm.js"},
+      "id": "ab38f1ac-660e-43ca-ad56-dc291e63924a",
+      "name": "Build DM Receipt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1220, 0]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.BASEROW_API_URL + '/database/rows/table/' + $env.BASEROW_DLQ_TABLE_ID + '/' + $json.row_id + '/?user_field_names=true' }}",
+        "sendHeaders": true,
+        "headerParameters": {"parameters": [{"name": "Authorization", "value": "={{ 'Token ' + $env.CHECKIN_BASEROW_DLQ_TOKEN }}"}]},
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({dm_notified_at: $json.dm_notified_at}) }}",
+        "options": {"timeout": 10000}
+      },
+      "id": "b2dca144-4c90-49ee-935d-026c68475068",
+      "name": "Persist DM Receipt",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1460, 0],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    }
+  ],
+  "connections": {
+    "Submit Workflow Failed": {"main": [[{"node": "Fetch Failed Submit Execution", "type": "main", "index": 0}]]},
+    "Fetch Failed Submit Execution": {"main": [[{"node": "Extract Failure Context", "type": "main", "index": 0}]]},
+    "Reconcile Every 5 Minutes": {"main": [[{"node": "List Failed Submit Executions", "type": "main", "index": 0}]]},
+    "List Failed Submit Executions": {"main": [[{"node": "Extract Failure Context", "type": "main", "index": 0}]]},
+    "Extract Failure Context": {"main": [[{"node": "Build DLQ Record", "type": "main", "index": 0}]]},
+    "Build DLQ Record": {"main": [[{"node": "Find Existing DLQ Row", "type": "main", "index": 0}]]},
+    "Find Existing DLQ Row": {"main": [[{"node": "DLQ Row Missing", "type": "main", "index": 0}]]},
+    "DLQ Row Missing": {"main": [
+      [{"node": "Create DLQ Row", "type": "main", "index": 0}],
+      [{"node": "Guard Duplicate DM", "type": "main", "index": 0}]
+    ]},
+    "Create DLQ Row": {"main": [[{"node": "Guard Duplicate DM", "type": "main", "index": 0}]]},
+    "Guard Duplicate DM": {"main": [[{"node": "Send Verbatim Failure DM", "type": "main", "index": 0}]]},
+    "Send Verbatim Failure DM": {"main": [[{"node": "Build DM Receipt", "type": "main", "index": 0}]]},
+    "Build DM Receipt": {"main": [[{"node": "Persist DM Receipt", "type": "main", "index": 0}]]}
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false,
+    "timezone": "UTC"
+  },
+  "active": false,
+  "versionId": "63249f40-4ee8-4175-842f-adb504d93741",
+  "meta": {"templateCredsSetupCompleted": true},
+  "tags": [{"name": "daily-checkin"}, {"name": "part-1"}, {"name": "dlq"}]
+}

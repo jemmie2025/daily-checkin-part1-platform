@@ -1,0 +1,162 @@
+config_version: 1
+target_vault_version: "1.18+"
+target_nomad_version: "1.10+"
+environment: example
+
+vault:
+  address: https://vault.example.internal
+  namespace: ""
+  kv_mount: kv
+  kv_version: 2
+  logical_prefix: n8n/mattermost/checkin
+  auth_mount: jwt-nomad
+  jwt:
+    jwks_url: https://nomad.example.internal:4646/.well-known/jwks.json
+    jwks_ca_pem_file_env: VAULT_NOMAD_JWKS_CA_PEM_FILE
+    require_jwks_ca_pem: true
+    jwt_supported_algs:
+      - RS256
+      - EdDSA
+    audience: vault.io
+    token_type: service
+    token_period: 30m
+    token_explicit_max_ttl_seconds: 0
+    token_no_default_policy: true
+
+nomad:
+  namespace: platform
+  vault_cluster: default
+  workload_identity_ttl: 1h
+  template_destination: secrets/daily-checkin.env
+
+# Each entry is a distinct Nomad task and Vault identity. Values below are
+# secret coordinates and environment-variable names, never credentials.
+workloads:
+  - name: apisix
+    job_id: daily-checkin-gateway
+    task: apisix
+    dedicated_task: true
+    role_name: daily-checkin-apisix
+    policy_name: daily-checkin-apisix
+    owner: platform-gateway
+    rotation_days: 90
+    bindings:
+      - env: CHECKIN_REDIS_PASSWORD
+        secret_path: apisix
+        key: redis_password
+      - env: CHECKIN_TELEMETRY_AUTH_HEADER
+        secret_path: apisix
+        key: telemetry_auth_header
+
+  - name: n8n-open
+    job_id: daily-checkin-open
+    task: n8n-open
+    dedicated_task: true
+    role_name: daily-checkin-n8n-open
+    policy_name: daily-checkin-n8n-open
+    owner: checkin-backend
+    rotation_days: 90
+    bindings:
+      - env: CHECKIN_DIALOG_STATE_SIGNING_KEY
+        secret_path: dialog-shared
+        key: state_signing_key
+      - env: CHECKIN_MATTERMOST_COMMAND_TOKEN
+        secret_path: open
+        key: mattermost_command_token
+      - env: CHECKIN_MATTERMOST_OPEN_BOT_TOKEN
+        secret_path: open
+        key: mattermost_bot_token
+      - env: CHECKIN_COMPLIANCE_SLA_READ_TOKEN
+        secret_path: open
+        key: compliance_sla_read_token
+
+  - name: n8n-submit
+    job_id: daily-checkin-submit
+    task: n8n-submit
+    dedicated_task: true
+    role_name: daily-checkin-n8n-submit
+    policy_name: daily-checkin-n8n-submit
+    owner: checkin-backend
+    rotation_days: 90
+    bindings:
+      - env: CHECKIN_DIALOG_STATE_SIGNING_KEY
+        secret_path: dialog-shared
+        key: state_signing_key
+      - env: CHECKIN_MATTERMOST_SUBMIT_SIGNATURE
+        secret_path: submit
+        key: mattermost_submit_signature
+      - env: CHECKIN_MATTERMOST_SUBMIT_BOT_TOKEN
+        secret_path: submit
+        key: mattermost_bot_token
+      - env: CHECKIN_BASEROW_CHECKINS_TOKEN
+        secret_path: submit
+        key: baserow_checkins_token
+      - env: CHECKIN_EVENT_INGEST_TOKEN
+        secret_path: event-shared
+        key: event_ingest_token
+
+  - name: n8n-analytics
+    job_id: daily-checkin-analytics
+    task: n8n-analytics
+    dedicated_task: true
+    role_name: daily-checkin-n8n-analytics
+    policy_name: daily-checkin-n8n-analytics
+    owner: data-platform
+    rotation_days: 90
+    bindings:
+      - env: CHECKIN_EVENT_INGEST_TOKEN
+        secret_path: event-shared
+        key: event_ingest_token
+      - env: CHECKIN_CLICKHOUSE_INGEST_USER
+        secret_path: analytics
+        key: clickhouse_ingest_user
+      - env: CHECKIN_CLICKHOUSE_INGEST_KEY
+        secret_path: analytics
+        key: clickhouse_ingest_key
+      - env: CHECKIN_ANALYTICS_ROSTER_TOKEN
+        secret_path: analytics
+        key: roster_read_token
+
+  - name: n8n-compliance
+    job_id: daily-checkin-compliance
+    task: n8n-compliance
+    dedicated_task: true
+    role_name: daily-checkin-n8n-compliance
+    policy_name: daily-checkin-n8n-compliance
+    owner: compliance-automation
+    rotation_days: 90
+    bindings:
+      - env: CHECKIN_MATTERMOST_COMPLIANCE_BOT_TOKEN
+        secret_path: compliance
+        key: mattermost_bot_token
+      - env: CHECKIN_BASEROW_VIOLATIONS_TOKEN
+        secret_path: compliance
+        key: baserow_violations_token
+      - env: CHECKIN_ROSTER_READ_TOKEN
+        secret_path: compliance
+        key: roster_read_token
+      - env: CHECKIN_CALENDAR_READ_TOKEN
+        secret_path: compliance
+        key: calendar_read_token
+
+  - name: n8n-dlq
+    job_id: daily-checkin-dlq
+    task: n8n-dlq
+    dedicated_task: true
+    role_name: daily-checkin-n8n-dlq
+    policy_name: daily-checkin-n8n-dlq
+    owner: platform-operations
+    rotation_days: 90
+    bindings:
+      - env: CHECKIN_MATTERMOST_DLQ_BOT_TOKEN
+        secret_path: dlq
+        key: mattermost_bot_token
+      - env: CHECKIN_BASEROW_DLQ_TOKEN
+        secret_path: dlq
+        key: baserow_dlq_token
+      - env: CHECKIN_REPLAY_TOKEN
+        secret_path: dlq
+        key: replay_token
+      - env: CHECKIN_N8N_EXECUTION_READ_TOKEN
+        secret_path: dlq
+        key: n8n_execution_read_token

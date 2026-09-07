@@ -1,0 +1,27 @@
+{
+  "event_id": "90c9a498-9583-4f52-9167-2e30aa19d826",
+  "event_name": "checkin.cancelled",
+  "event_version": 1,
+  "occurred_at": "2026-09-04T16:05:01Z",
+  "correlation_id": "ci-20260904-01HV7DN2",
+  "source": "n8n_submit_handler",
+  "user": {
+    "user_id": "mm-user-1002"
+  },
+  "pod": {
+    "pod_id": "pod-nails-squad"
+  },
+  "cycle": {
+    "cycle_date": "2026-09-04",
+    "checkin_type": "ADHOC",
+    "sla_code": "NAILS-POD-ADHOC"
+  },
+  "dialog_version": "checkin_v1",
+  "outcome": {
+    "latency_ms": 35
+  },
+  "trace": {
+    "request_id": "req-01HV7DN2M7E4",
+    "execution_id": "n8n-58123"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "default_role": "",
+  "jwks_url": "https://nomad.example.internal:4646/.well-known/jwks.json",
+  "jwt_supported_algs": [
+    "RS256",
+    "EdDSA"
+  ]
+}

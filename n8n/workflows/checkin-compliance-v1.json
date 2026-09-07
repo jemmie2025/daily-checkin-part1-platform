@@ -1,0 +1,608 @@
+{
+  "name": "Daily Check-in — Compliance v1",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "4d06cab5-df67-45d3-ad6a-859e334fb61c",
+      "name": "Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1040,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.CHECKIN_COMPLIANCE_SNAPSHOT_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.CHECKIN_ROSTER_READ_TOKEN }}"
+            },
+            {
+              "name": "X-Correlation-ID",
+              "value": "={{ 'compliance-' + $execution.id }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "41e9bffe-414d-442c-a907-c445fd7c1e80",
+      "name": "Fetch Compliance Snapshot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -800,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst cycleDate = input.cycle_date;\nconst roster = input.roster ?? [];\nconst slaRules = input.sla_rules ?? [];\nconst leaveRecords = input.leave_records ?? [];\nconst holidays = input.holidays ?? [];\n\nfunction validDate(value) {\n  const match = /^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(value ?? '');\n  if (!match) return false;\n  const parsed = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));\n  return parsed.getUTCFullYear() === Number(match[1])\n    && parsed.getUTCMonth() === Number(match[2]) - 1\n    && parsed.getUTCDate() === Number(match[3]);\n}\nif (!validDate(cycleDate)) throw new Error('cycle_date must be a real YYYY-MM-DD date');\nif (typeof input.roster_source_version !== 'string' || !input.roster_source_version.length\n  || input.roster_source_version.length > 128) {\n  throw new Error('roster_source_version is invalid');\n}\nfor (const [name, value] of Object.entries({ roster, slaRules, leaveRecords, holidays })) {\n  if (!Array.isArray(value)) throw new Error(`${name} must be an array`);\n}\n\nfunction zonedTimeToUtc(dateText, timeText, timeZone) {\n  const [year, month, day] = dateText.split('-').map(Number);\n  const [hour, minute] = timeText.split(':').map(Number);\n  if (![year, month, day, hour, minute].every(Number.isInteger) || hour > 23 || minute > 59) {\n    throw new Error('local_due_time must use HH:MM');\n  }\n  const target = Date.UTC(year, month - 1, day, hour, minute, 0);\n  let guess = target;\n  const formatter = new Intl.DateTimeFormat('en-CA', {\n    timeZone,\n    year: 'numeric',\n    month: '2-digit',\n    day: '2-digit',\n    hour: '2-digit',\n    minute: '2-digit',\n    second: '2-digit',\n    hourCycle: 'h23',\n  });\n  for (let pass = 0; pass < 3; pass += 1) {\n    const parts = Object.fromEntries(\n      formatter.formatToParts(new Date(guess)).filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]),\n    );\n    const represented = Date.UTC(\n      Number(parts.year),\n      Number(parts.month) - 1,\n      Number(parts.day),\n      Number(parts.hour),\n      Number(parts.minute),\n      Number(parts.second),\n    );\n    guess += target - represented;\n  }\n  const finalParts = Object.fromEntries(\n    formatter.formatToParts(new Date(guess)).filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]),\n  );\n  const roundTrip = Date.UTC(\n    Number(finalParts.year),\n    Number(finalParts.month) - 1,\n    Number(finalParts.day),\n    Number(finalParts.hour),\n    Number(finalParts.minute),\n    Number(finalParts.second),\n  );\n  if (roundTrip !== target) throw new Error('local due time does not exist in timezone');\n  return new Date(guess).toISOString().replace('.000Z', 'Z');\n}\n\nfunction between(day, start, end) {\n  return day >= start && day <= end;\n}\n\nfunction attendanceState(member) {\n  const activeFrom = member.active_from ?? '1900-01-01';\n  const activeUntil = member.active_until ?? '9999-12-31';\n  if (!validDate(activeFrom) || !validDate(activeUntil) || activeFrom > activeUntil) {\n    throw new Error('roster active dates are invalid');\n  }\n  if (member.active === false || !between(cycleDate, activeFrom, activeUntil)) return 'inactive';\n  if (leaveRecords.some((record) => (\n    record.user_id === member.user_id\n    && record.status === 'approved'\n    && between(cycleDate, record.start_date, record.end_date)\n  ))) return 'approved_leave';\n  if (holidays.some((holiday) => (\n    holiday.date === cycleDate\n    && (holiday.scope === 'global' || (holiday.scope === 'pod' && holiday.pod_id === member.pod_id))\n  ))) return 'holiday';\n  return 'expected';\n}\n\nfor (const record of leaveRecords) {\n  if (typeof record.user_id !== 'string' || !record.user_id.length\n    || !['approved', 'requested', 'rejected', 'cancelled'].includes(record.status)\n    || !validDate(record.start_date) || !validDate(record.end_date)\n    || record.start_date > record.end_date) {\n    throw new Error('leave record is invalid');\n  }\n}\nfor (const holiday of holidays) {\n  if (!validDate(holiday.date) || !['global', 'pod'].includes(holiday.scope)\n    || (holiday.scope === 'pod' && (typeof holiday.pod_id !== 'string' || !holiday.pod_id.length))) {\n    throw new Error('holiday record is invalid');\n  }\n}\n\nconst seen = new Set();\nconst expectationIds = new Set();\nconst expectations = [];\nfor (const member of roster) {\n  for (const field of ['user_id', 'user_name', 'pod_id', 'timezone', 'mattermost_dm_channel_id', 'pod_lead_channel_id']) {\n    if (typeof member[field] !== 'string' || !member[field].length) throw new Error(`roster member missing ${field}`);\n  }\n  if (typeof member.active !== 'boolean') throw new Error('roster member active must be boolean');\n  if (seen.has(member.user_id)) throw new Error('duplicate roster user_id');\n  seen.add(member.user_id);\n  const state = attendanceState(member);\n  for (const rule of slaRules) {\n    if (!['SOD', 'EOD'].includes(rule.checkin_type)) throw new Error('invalid SLA checkin_type');\n    if (rule.pod_id && rule.pod_id !== member.pod_id) continue;\n    if (typeof rule.sla_code !== 'string' || !rule.sla_code.length || rule.sla_code.length > 128) {\n      throw new Error('invalid SLA code');\n    }\n    if (!/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/.test(rule.local_due_time ?? '')) {\n      throw new Error('local_due_time must use HH:MM');\n    }\n    const expectationId = [member.user_id, cycleDate, rule.checkin_type, rule.sla_code].join('|');\n    if (expectationIds.has(expectationId)) throw new Error('duplicate SLA expectation');\n    expectationIds.add(expectationId);\n    expectations.push({\n      expectation_id: expectationId,\n      user_id: member.user_id,\n      user_name: member.user_name,\n      mattermost_dm_channel_id: member.mattermost_dm_channel_id,\n      pod_id: member.pod_id,\n      pod_lead_channel_id: member.pod_lead_channel_id,\n      timezone: member.timezone,\n      cycle_date: cycleDate,\n      checkin_type: rule.checkin_type,\n      sla_code: rule.sla_code,\n      sla_due_at: zonedTimeToUtc(cycleDate, rule.local_due_time, member.timezone),\n      attendance_state: state,\n      roster_source_version: input.roster_source_version,\n    });\n  }\n}\n\nexpectations.sort((left, right) => left.expectation_id.localeCompare(right.expectation_id));\nreturn [{ json: { ...input, expectations } }];"
+      },
+      "id": "97dcd434-8fc3-405f-98f4-29e06630fb44",
+      "name": "Build Expectations",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst input = $input.first().json;\nconst now = new Date(input.now ?? new Date().toISOString());\nif (Number.isNaN(now.getTime())) throw new Error('now must be RFC3339');\n\nconst expectations = input.expectations ?? [];\nconst checkins = input.checkins ?? [];\nconst violations = input.violations ?? [];\nconst state = $getWorkflowStaticData('global');\nconst existingActionIds = new Set([...(input.existing_action_ids ?? []), ...(state.action_ids ?? [])]);\nconst nudgeBeforeMs = 60 * 60 * 1000;\nconst escalationAfterMs = 24 * 60 * 60 * 1000;\n\nconst digest = (...parts) => crypto.createHash('sha256').update(parts.join('|')).digest('hex').slice(0, 32);\nconst checkinKey = (row) => [row.user_id, row.cycle_date, row.checkin_type].join('|');\nconst accepted = new Map(checkins.map((row) => [checkinKey(row), row]));\nconst violationByKey = new Map(\n  violations.filter((row) => row.rule_id === 'PI-6').map((row) => [checkinKey(row), row]),\n);\nconst actions = [];\nconst escalations = new Map();\n\nfor (const expectation of expectations) {\n  if (expectation.attendance_state !== 'expected') continue;\n  const key = checkinKey(expectation);\n  const dueAt = new Date(expectation.sla_due_at);\n  if (Number.isNaN(dueAt.getTime())) throw new Error('sla_due_at must be RFC3339');\n  const acceptedRow = accepted.get(key);\n  const existingViolation = violationByKey.get(key);\n\n  if (acceptedRow) {\n    if (existingViolation?.status === 'open') {\n      const checkinId = acceptedRow.checkin_id ?? key;\n      const actionId = `resolve_${digest(existingViolation.violation_id, checkinId)}`;\n      if (!existingActionIds.has(actionId)) {\n        actions.push({\n          action_id: actionId,\n          action_type: 'resolve_violation',\n          violation_id: existingViolation.violation_id,\n          baserow_row_id: existingViolation.id,\n          resolved_at: now.toISOString(),\n          resolved_by_checkin_id: checkinId,\n        });\n      }\n    }\n    continue;\n  }\n\n  const nudgeId = `nudge_${digest(expectation.expectation_id)}`;\n  if (now >= new Date(dueAt.getTime() - nudgeBeforeMs) && now < dueAt && !existingActionIds.has(nudgeId)) {\n    actions.push({\n      action_id: nudgeId,\n      action_type: 'nudge',\n      channel_id: expectation.mattermost_dm_channel_id,\n      message: `⏰ Daily Check-in reminder: your ${expectation.checkin_type} update is due at ${expectation.sla_due_at}. Use /ci to submit it.`,\n    });\n  }\n\n  if (expectation.checkin_type !== 'EOD' || now < dueAt) continue;\n  const violationId = `viol_${digest(expectation.user_id, expectation.cycle_date, 'EOD', 'PI-6')}`;\n  const record = existingViolation ?? {\n    violation_id: violationId,\n    rule_id: 'PI-6',\n    rule_name: 'EOD status update not submitted',\n    user_id: expectation.user_id,\n    user_name: expectation.user_name,\n    pod_id: expectation.pod_id,\n    cycle_date: expectation.cycle_date,\n    checkin_type: 'EOD',\n    sla_code: expectation.sla_code,\n    sla_due_at: expectation.sla_due_at,\n    detected_at: now.toISOString(),\n    status: 'open',\n    evidence_json: JSON.stringify({\n      accepted_checkin_found: false,\n      expected: true,\n      expectation_id: expectation.expectation_id,\n      roster_source_version: expectation.roster_source_version,\n    }),\n    workflow_execution_id: $execution.id,\n    resolved_at: null,\n    resolved_by_checkin_id: null,\n    waiver_reason: null,\n  };\n  const actionId = `upsert_${violationId}`;\n  if (!existingViolation && !existingActionIds.has(actionId)) {\n    actions.push({ action_id: actionId, action_type: 'upsert_violation', record });\n  }\n  if (now >= new Date(dueAt.getTime() + escalationAfterMs) && record.status === 'open') {\n    const group = [expectation.pod_id, expectation.cycle_date, expectation.checkin_type].join('|');\n    if (!escalations.has(group)) escalations.set(group, []);\n    escalations.get(group).push({ record, expectation });\n  }\n}\n\nfor (const [group, rows] of [...escalations.entries()].sort()) {\n  const [podId, cycleDate, checkinType] = group.split('|');\n  const actionId = `esc_${digest(podId, cycleDate, checkinType)}`;\n  if (existingActionIds.has(actionId)) continue;\n  const names = rows.map((row) => row.expectation.user_name).sort();\n  actions.push({\n    action_id: actionId,\n    action_type: 'escalation_digest',\n    channel_id: rows[0].expectation.pod_lead_channel_id,\n    message: `🚨 Daily Check-in SLA digest — ${cycleDate} ${checkinType}\\nMissing (${names.length}): ${names.join(', ')}`,\n    violation_ids: rows.map((row) => row.record.violation_id).sort(),\n  });\n}\n\nreturn actions.map((action) => ({ json: action }));"
+      },
+      "id": "4a750b6e-fb80-454a-80e8-1b28d210d7d5",
+      "name": "Plan Compliance Actions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -320,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action_type }}",
+                    "rightValue": "nudge",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "nudge"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action_type }}",
+                    "rightValue": "upsert_violation",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "upsert"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action_type }}",
+                    "rightValue": "resolve_violation",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "resolve"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action_type }}",
+                    "rightValue": "escalation_digest",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "escalate"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "a9507cd8-d7c5-49ba-89ec-4c73d3ca84d6",
+      "name": "Route Action",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -80,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.MATTERMOST_URL + '/api/v4/posts' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.CHECKIN_MATTERMOST_COMPLIANCE_BOT_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({channel_id: $json.channel_id, message: $json.message, props: {checkin_action_id: $json.action_id}}) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "df9dfdc3-8c79-42ab-af67-634f932a31a0",
+      "name": "Send Nudge",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        200,
+        -320
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.BASEROW_API_URL + '/database/rows/table/' + $env.BASEROW_VIOLATIONS_TABLE_ID + '/?user_field_names=true&filter__field_' + $env.BASEROW_VIOLATION_ID_FIELD_ID + '__equal=' + encodeURIComponent($json.record.violation_id) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Token ' + $env.CHECKIN_BASEROW_VIOLATIONS_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "d41610b8-a1b6-4168-8500-79a0f1f44734",
+      "name": "Find Existing Violation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        200,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.count }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "af996954-b074-44e0-bd58-a3e7ecc354cb",
+      "name": "Violation Missing",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BASEROW_API_URL + '/database/rows/table/' + $env.BASEROW_VIOLATIONS_TABLE_ID + '/?user_field_names=true' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Token ' + $env.CHECKIN_BASEROW_VIOLATIONS_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($('Plan Compliance Actions').item.json.record) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "f4684860-d73c-49e0-8e3e-bf399eaa5cb2",
+      "name": "Create PI-6 Violation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        680,
+        -180
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.BASEROW_API_URL + '/database/rows/table/' + $env.BASEROW_VIOLATIONS_TABLE_ID + '/?user_field_names=true&filter__field_' + $env.BASEROW_VIOLATION_ID_FIELD_ID + '__equal=' + encodeURIComponent($json.violation_id) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Token ' + $env.CHECKIN_BASEROW_VIOLATIONS_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "71e39595-339d-470e-af38-c923e2d5ef59",
+      "name": "Find Violation to Resolve",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        200,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.BASEROW_API_URL + '/database/rows/table/' + $env.BASEROW_VIOLATIONS_TABLE_ID + '/' + $json.results[0].id + '/?user_field_names=true' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Token ' + $env.CHECKIN_BASEROW_VIOLATIONS_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({status: 'resolved', resolved_at: $('Plan Compliance Actions').item.json.resolved_at, resolved_by_checkin_id: $('Plan Compliance Actions').item.json.resolved_by_checkin_id}) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "4ec65dcc-b282-43bc-8401-90824ee4f156",
+      "name": "Resolve PI-6 Violation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        100
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.MATTERMOST_URL + '/api/v4/posts' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.CHECKIN_MATTERMOST_COMPLIANCE_BOT_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({channel_id: $json.channel_id, message: $json.message, props: {checkin_action_id: $json.action_id}}) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "d0a8302a-b964-43f8-a75f-beb93b2bc5b5",
+      "name": "Send Escalation Digest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        200,
+        320
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst action = $('Plan Compliance Actions').item.json;\nconst state = $getWorkflowStaticData('global');\nconst current = new Set(state.action_ids ?? []);\ncurrent.add(action.action_id);\nstate.action_ids = [...current].sort().slice(-10000);\nreturn [{ json: { action_id: action.action_id, status: 'committed', downstream: input } }];"
+      },
+      "id": "1b65eafd-29fb-4f09-99bf-f645c8ae4e4f",
+      "name": "Commit Action ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        920,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Every 5 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Fetch Compliance Snapshot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Compliance Snapshot": {
+      "main": [
+        [
+          {
+            "node": "Build Expectations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Expectations": {
+      "main": [
+        [
+          {
+            "node": "Plan Compliance Actions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan Compliance Actions": {
+      "main": [
+        [
+          {
+            "node": "Route Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Action": {
+      "main": [
+        [
+          {
+            "node": "Send Nudge",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Find Existing Violation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Find Violation to Resolve",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Escalation Digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Nudge": {
+      "main": [
+        [
+          {
+            "node": "Commit Action ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Existing Violation": {
+      "main": [
+        [
+          {
+            "node": "Violation Missing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Violation Missing": {
+      "main": [
+        [
+          {
+            "node": "Create PI-6 Violation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Commit Action ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create PI-6 Violation": {
+      "main": [
+        [
+          {
+            "node": "Commit Action ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Violation to Resolve": {
+      "main": [
+        [
+          {
+            "node": "Resolve PI-6 Violation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve PI-6 Violation": {
+      "main": [
+        [
+          {
+            "node": "Commit Action ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Escalation Digest": {
+      "main": [
+        [
+          {
+            "node": "Commit Action ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false,
+    "timezone": "UTC"
+  },
+  "active": false,
+  "versionId": "caf642c6-34a7-4ffb-916a-22e33b7eb56b",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [
+    {
+      "name": "daily-checkin"
+    },
+    {
+      "name": "part-1"
+    },
+    {
+      "name": "compliance"
+    }
+  ]
+}

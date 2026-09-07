@@ -1,0 +1,12 @@
+database_name: Daily Check-in ClickHouse
+sqlalchemy_uri: clickhousedb://checkin_superset_reader:XXXXXXXXXX@clickhouse.example.internal:8443/checkin_analytics?secure=true
+cache_timeout: 300
+expose_in_sqllab: false
+allow_run_async: true
+allow_ctas: false
+allow_cvas: false
+allow_dml: false
+allow_file_upload: false
+extra: '{"engine_params":{"connect_args":{"secure":true,"verify":true}},"metadata_params":{},"schemas_allowed_for_file_upload":[]}'
+uuid: 9bb1d984-e169-4454-9842-81d876cc1943
+version: 1.0.0

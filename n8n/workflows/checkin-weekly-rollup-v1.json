@@ -1,0 +1,162 @@
+{
+  "name": "Daily Check-in — Weekly Rollup v1",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "weeksInterval": 1,
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "id": "d9885743-bad8-4ad1-a276-50d334aa8837",
+      "name": "Every Monday",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -520,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.CHECKIN_WEEKLY_SNAPSHOT_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.CHECKIN_ROSTER_READ_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "61bc31e9-1926-4274-b9a1-69840cc34cd6",
+      "name": "Fetch Weekly Snapshot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -280,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst input = $input.first().json;\nconst expectations = input.expectations ?? [];\nconst checkins = input.checkins ?? [];\nconst start = input.period_start;\nconst end = input.period_end;\n\nconst parseDate = (value, field) => {\n  const match = /^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(value ?? '');\n  if (!match) throw new Error(`${field} must use YYYY-MM-DD`);\n  const parsed = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));\n  if (parsed.getUTCFullYear() !== Number(match[1])\n    || parsed.getUTCMonth() !== Number(match[2]) - 1\n    || parsed.getUTCDate() !== Number(match[3])) {\n    throw new Error(`${field} must be a real date`);\n  }\n  return parsed;\n};\nconst startDate = parseDate(start, 'period_start');\nconst endDate = parseDate(end, 'period_end');\nconst dayCount = Math.round((endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000));\nif (dayCount < 0 || dayCount > 6) throw new Error('weekly period must span one to seven calendar days');\nif (!Array.isArray(expectations) || !Array.isArray(checkins)) throw new Error('weekly rows must be arrays');\n\nconst digest = (...parts) => crypto.createHash('sha256').update(parts.join('|')).digest('hex').slice(0, 32);\nconst key = (row) => [row.user_id, row.cycle_date, row.checkin_type].join('|');\nconst within = (row) => row.cycle_date >= start && row.cycle_date <= end;\nconst pods = new Set(\n  expectations.filter((row) => row.attendance_state === 'expected' && within(row)).map((row) => row.pod_id),\n);\nconst output = [];\n\nfor (const podId of [...pods].sort()) {\n  if (typeof podId !== 'string' || !podId.length) throw new Error('pod_id is invalid');\n  const expected = new Set(\n    expectations.filter((row) => row.pod_id === podId && row.attendance_state === 'expected' && within(row)).map(key),\n  );\n  const submittedMap = new Map(\n    checkins.filter((row) => row.pod_id === podId && within(row) && expected.has(key(row))).map((row) => [key(row), row]),\n  );\n  const rows = [...submittedMap.values()];\n  const expectedCount = expected.size;\n  const submittedCount = rows.length;\n  const proofCount = rows.filter((row) => Boolean(row.has_proof)).length;\n  const blockedCount = rows.reduce((total, row) => {\n    const count = Number(row.blocked_count ?? 0);\n    if (!Number.isInteger(count) || count < 0 || count > 20) throw new Error('blocked_count is invalid');\n    return total + count;\n  }, 0);\n  const channelId = input.pod_lead_channels?.[podId];\n  if (typeof channelId !== 'string' || !channelId.length) throw new Error(`missing pod lead channel for ${podId}`);\n  output.push({\n    rollup_id: `rollup_${digest(podId, start, end)}`,\n    pod_id: podId,\n    channel_id: channelId,\n    period_start: start,\n    period_end: end,\n    expected_count: expectedCount,\n    submitted_count: submittedCount,\n    missing_count: Math.max(expectedCount - submittedCount, 0),\n    on_time_count: rows.filter((row) => row.sla_status === 'on_time').length,\n    late_count: rows.filter((row) => row.sla_status === 'late').length,\n    submission_rate: expectedCount ? submittedCount / expectedCount : 0,\n    proof_attach_rate: submittedCount ? proofCount / submittedCount : 0,\n    blocked_task_count: blockedCount,\n  });\n}\n\nreturn output.map((rollup) => ({\n  json: {\n    ...rollup,\n    message: `📊 Weekly Daily Check-in rollup (${start} to ${end})\\nSubmission: ${(rollup.submission_rate * 100).toFixed(1)}% (${rollup.submitted_count}/${rollup.expected_count})\\nOn time: ${rollup.on_time_count} | Late: ${rollup.late_count} | Missing: ${rollup.missing_count}\\nProof attached: ${(rollup.proof_attach_rate * 100).toFixed(1)}% | Blocked tasks: ${rollup.blocked_task_count}`,\n  },\n}));"
+      },
+      "id": "41f60e0f-8cb2-43c1-8c03-0850edb68d8b",
+      "name": "Calculate Weekly Rollups",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -40,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.MATTERMOST_URL + '/api/v4/posts' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.CHECKIN_MATTERMOST_COMPLIANCE_BOT_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({channel_id: $json.channel_id, message: $json.message, props: {checkin_rollup_id: $json.rollup_id}}) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "473a66da-0966-4ea7-9237-c54069af42c6",
+      "name": "Post Pod Rollup",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        200,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    }
+  ],
+  "connections": {
+    "Every Monday": {
+      "main": [
+        [
+          {
+            "node": "Fetch Weekly Snapshot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Weekly Snapshot": {
+      "main": [
+        [
+          {
+            "node": "Calculate Weekly Rollups",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Weekly Rollups": {
+      "main": [
+        [
+          {
+            "node": "Post Pod Rollup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false,
+    "timezone": "UTC"
+  },
+  "active": false,
+  "versionId": "4588aeaf-3c79-4fbf-855e-ff01c25d0eaf",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [
+    {
+      "name": "daily-checkin"
+    },
+    {
+      "name": "part-1"
+    },
+    {
+      "name": "weekly-rollup"
+    }
+  ]
+}

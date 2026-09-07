@@ -1,0 +1,72 @@
+contract_version: 1
+dialog_version: checkin_v1
+
+gateway:
+  open_path: /webhook/checkin/open
+  submit_path: /webhook/checkin/submit
+  open_budget_ms: 2000
+  trigger_expiry_budget_ms: 3000
+  max_body_bytes: 65536
+  rate_limit:
+    requests: 10
+    window_seconds: 60
+    key: allowlisted_source_mattermost_user_id
+  allow_methods:
+    - POST
+  require_tls: true
+  require_ip_allowlist: true
+
+reliability:
+  baserow_write_attempts: 3
+  retry_backoff_seconds:
+    - 1
+    - 4
+    - 16
+  delivery_semantics: at_least_once
+  idempotency_required: true
+  dlq_resolved_retention_days: 30
+
+compliance:
+  nudge_before_sla_minutes: 60
+  breach_rule_id: PI-6
+  escalation_after_sla_hours: 24
+  weekly_rollup_enabled: true
+  leave_and_holiday_suppression_required: true
+
+analytics:
+  event_contract: checkin-event.v1
+  event_detail_retention_months: 24
+  aggregate_retention: aggregate_only_after_detail_ttl
+  telemetry_contains_raw_input: false
+  telemetry_contains_proof_urls: false
+  telemetry_contains_user_name: false
+
+secrets:
+  engine: vault_kv_v2
+  logical_prefix: kv/n8n/mattermost/checkin
+  runtime_delivery: nomad_workload_identity_template
+  workload_boundaries:
+    - apisix
+    - n8n-open
+    - n8n-submit
+    - n8n-compliance
+    - n8n-dlq
+    - n8n-analytics
+  vault_token_exposed_to_task: false
+  maximum_static_credential_age_days: 90
+
+required_external_values:
+  - apisix_admin_endpoint
+  - mattermost_egress_cidr
+  - n8n_upstream_endpoint
+  - vault_address_and_auth_role
+  - baserow_table_ids
+  - baserow_dlq_replay_view_id
+  - n8n_submit_workflow_id
+  - clickhouse_endpoint_database_and_user
+  - superset_workspace
+  - approved_compliance_source_api
+  - active_roster_and_pod_mapping
+  - user_timezones
+  - holiday_and_leave_source
+  - pod_lead_channel_ids

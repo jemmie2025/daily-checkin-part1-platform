@@ -1,0 +1,278 @@
+{
+  "name": "Daily Check-in — DLQ Replay v1",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "f7df4902-495e-485b-85ed-cc08a4f1f2a1",
+      "name": "Every 15 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -680,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.BASEROW_API_URL + '/database/rows/table/' + $env.BASEROW_DLQ_TABLE_ID + '/?user_field_names=true&view_id=' + encodeURIComponent($env.BASEROW_DLQ_REPLAY_VIEW_ID) + '&size=100&order_by=next_retry_at' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Token ' + $env.CHECKIN_BASEROW_DLQ_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "b29b1de5-1c64-4871-8178-8c80b714f5e5",
+      "name": "Fetch Replay Candidates",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -440,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst now = new Date(input.now ?? new Date().toISOString());\nif (Number.isNaN(now.getTime())) throw new Error('now must be RFC3339');\n\nconst rows = input.results ?? input.rows ?? [];\nif (!Array.isArray(rows)) throw new Error('DLQ candidate response must contain an array');\nconst steps = {\n  baserow_checkins_write: ['upsert_checkin', 'ensure_canonical_post', 'ensure_event'],\n  mattermost_canonical_post: ['verify_checkin', 'ensure_canonical_post', 'ensure_event'],\n  event_dispatch: ['verify_checkin', 'verify_canonical_post', 'ensure_event'],\n};\nconst selectValue = (value) => (\n  value && typeof value === 'object' && !Array.isArray(value) ? value.value : value\n);\nconst parseOptionalDate = (value, field) => {\n  if (value === null || value === undefined || value === '') return null;\n  const parsed = new Date(value);\n  if (Number.isNaN(parsed.getTime())) throw new Error(`${field} must be RFC3339`);\n  return parsed;\n};\nconst requiredText = (value, field, maximum = 300) => {\n  if (typeof value !== 'string' || !value.length || value.length > maximum) {\n    throw new Error(`${field} is invalid`);\n  }\n  return value;\n};\nconst output = [];\n\nfor (const row of rows) {\n  const status = selectValue(row.status);\n  if (!['pending', 'replaying'].includes(status)) continue;\n  const nextRetry = parseOptionalDate(row.next_retry_at, 'next_retry_at');\n  if (nextRetry && now < nextRetry) continue;\n\n  const replayStarted = parseOptionalDate(row.replay_started_at, 'replay_started_at');\n  if (status === 'replaying') {\n    if (!replayStarted) throw new Error('replaying row is missing replay_started_at');\n    if (now.getTime() - replayStarted.getTime() < 15 * 60 * 1000) continue;\n  }\n\n  const failureStage = selectValue(row.failure_stage);\n  if (!steps[failureStage]) throw new Error('invalid DLQ failure_stage');\n  const rowId = Number(row.id);\n  if (!Number.isInteger(rowId) || rowId < 1) throw new Error('DLQ row id is invalid');\n  const replayKey = requiredText(row.replay_key, 'replay_key');\n  const correlationId = requiredText(row.correlation_id, 'correlation_id', 128);\n  if (typeof row.raw_submission !== 'string' || !row.raw_submission.length\n    || Buffer.byteLength(row.raw_submission, 'utf8') > 65536) {\n    throw new Error('raw_submission byte limit violated');\n  }\n\n  output.push({\n    json: {\n      ...row,\n      id: rowId,\n      status: 'replaying',\n      failure_stage: failureStage,\n      replay_key: replayKey,\n      correlation_id: correlationId,\n      replay_started_at: now.toISOString(),\n      replay_owner: `n8n-dlq-${$execution.id}`,\n      replay_attempt_count: Number(row.replay_attempt_count ?? 0) + 1,\n      replay_steps: steps[failureStage],\n    },\n  });\n}\nreturn output;"
+      },
+      "id": "50be1a8c-41ce-4ed4-88ce-79548ac9d56c",
+      "name": "Plan Stage-Safe Replay",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -200,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.BASEROW_API_URL + '/database/rows/table/' + $env.BASEROW_DLQ_TABLE_ID + '/' + $json.id + '/?user_field_names=true' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Token ' + $env.CHECKIN_BASEROW_DLQ_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({status: $json.status, replay_started_at: $json.replay_started_at, replay_owner: $json.replay_owner, replay_attempt_count: $json.replay_attempt_count}) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "c8e55aa7-b394-4489-ae88-1b702d044d63",
+      "name": "Acquire Replay Lease",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        40,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CHECKIN_REPLAY_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.CHECKIN_REPLAY_TOKEN }}"
+            },
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $('Plan Stage-Safe Replay').item.json.replay_key }}"
+            },
+            {
+              "name": "X-Correlation-ID",
+              "value": "={{ $('Plan Stage-Safe Replay').item.json.correlation_id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({replay_key: $('Plan Stage-Safe Replay').item.json.replay_key, correlation_id: $('Plan Stage-Safe Replay').item.json.correlation_id, failure_stage: $('Plan Stage-Safe Replay').item.json.failure_stage, replay_steps: $('Plan Stage-Safe Replay').item.json.replay_steps, raw_submission: $('Plan Stage-Safe Replay').item.json.raw_submission}) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "ef0d534a-5f5e-4191-8be1-c02c6e1d66c1",
+      "name": "Execute Idempotent Replay",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        280,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 4000
+    },
+    {
+      "parameters": {
+        "jsCode": "const replay = $input.first().json;\nconst planned = $('Plan Stage-Safe Replay').item.json;\nconst leased = $('Acquire Replay Lease').item.json;\nconst required = ['status', 'checkin_id', 'correlation_id', 'replay_key'];\nif (!replay || typeof replay !== 'object' || Array.isArray(replay)\n  || Object.keys(replay).some((field) => !required.includes(field))\n  || required.some((field) => !Object.prototype.hasOwnProperty.call(replay, field))) {\n  throw new Error('replay response does not match replay-response.v1');\n}\nif (replay.status !== 'resolved') throw new Error('replay response status is not resolved');\nif (typeof replay.checkin_id !== 'string' || replay.checkin_id.length < 8 || replay.checkin_id.length > 300) {\n  throw new Error('replay response checkin_id is invalid');\n}\nif (replay.correlation_id !== planned.correlation_id || replay.replay_key !== planned.replay_key) {\n  throw new Error('replay response identity does not match request');\n}\nconst rowId = Number(leased.id ?? planned.id);\nif (!Number.isInteger(rowId) || rowId < 1) throw new Error('leased DLQ row identity is invalid');\nconst resolvedAt = new Date();\nconst deleteAfter = new Date(resolvedAt.getTime() + 30 * 24 * 60 * 60 * 1000);\nreturn [{\n  json: {\n    row_id: rowId,\n    patch: {\n      status: 'resolved',\n      resolved_at: resolvedAt.toISOString(),\n      resolved_checkin_id: replay.checkin_id,\n      next_retry_at: null,\n      retention_delete_after: deleteAfter.toISOString(),\n    },\n  },\n}];"
+      },
+      "id": "1750f96b-8f28-4915-864f-8d95c63d6857",
+      "name": "Build Resolution Patch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.BASEROW_API_URL + '/database/rows/table/' + $env.BASEROW_DLQ_TABLE_ID + '/' + $json.row_id + '/?user_field_names=true' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Token ' + $env.CHECKIN_BASEROW_DLQ_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json.patch) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "6a801ff5-9bb2-4fe4-8c2b-d85185c60ec9",
+      "name": "Resolve DLQ Row",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        760,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    }
+  ],
+  "connections": {
+    "Every 15 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Fetch Replay Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Replay Candidates": {
+      "main": [
+        [
+          {
+            "node": "Plan Stage-Safe Replay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan Stage-Safe Replay": {
+      "main": [
+        [
+          {
+            "node": "Acquire Replay Lease",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Acquire Replay Lease": {
+      "main": [
+        [
+          {
+            "node": "Execute Idempotent Replay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Idempotent Replay": {
+      "main": [
+        [
+          {
+            "node": "Build Resolution Patch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Resolution Patch": {
+      "main": [
+        [
+          {
+            "node": "Resolve DLQ Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false,
+    "timezone": "UTC"
+  },
+  "active": false,
+  "versionId": "b4acfdb0-aacf-4359-a3d3-df812f7f2ae7",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [
+    {
+      "name": "daily-checkin"
+    },
+    {
+      "name": "part-1"
+    },
+    {
+      "name": "dlq-replay"
+    }
+  ]
+}

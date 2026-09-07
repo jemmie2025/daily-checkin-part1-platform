@@ -1,0 +1,54 @@
+config_version: 1
+target_apisix_version: "3.18"
+environment: example
+
+resource_ids:
+  upstream: daily-checkin-n8n-v1
+  open_route: daily-checkin-open-v1
+  submit_route: daily-checkin-submit-v1
+
+gateway:
+  public_base_url: https://checkin-gateway.example.internal
+  open_path: /webhook/checkin/open
+  submit_path: /webhook/checkin/submit
+  allowed_source_cidrs:
+    - 192.0.2.0/24
+  max_body_bytes: 65536
+  custom_plugin_priority: 2999
+
+upstream:
+  base_url: https://n8n.example.internal
+  open_timeout_seconds:
+    connect: 0.3
+    send: 0.3
+    read: 1.8
+  submit_timeout_seconds:
+    connect: 1
+    send: 2
+    read: 10
+
+secret_delivery:
+  mode: nomad_template_env
+  vault_kv_version: 2
+  vault_path: kv/n8n/mattermost/checkin/apisix
+
+rate_limit:
+  count: 10
+  window_seconds: 60
+  key_variable: http_x_checkin_user_id
+  group: daily-checkin-user-v1
+  policy: redis
+  redis_host: redis.example.internal
+  redis_port: 6380
+  redis_password_secret_ref: $ENV://CHECKIN_REDIS_PASSWORD
+  redis_ssl: true
+  redis_ssl_verify: true
+  allow_degradation: false
+
+telemetry:
+  url: https://telemetry.example.internal/v1/apisix/checkin
+  auth_header_secret_ref: $ENV://CHECKIN_TELEMETRY_AUTH_HEADER
+  timeout_seconds: 1
+  ssl_verify: true
+  include_request_body: false
+  include_response_body: false

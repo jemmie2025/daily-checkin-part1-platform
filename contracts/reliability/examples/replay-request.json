@@ -1,0 +1,7 @@
+{
+  "replay_key": "n8n-58124|baserow_checkins_write",
+  "correlation_id": "ci-20260904-01HV7DR4",
+  "failure_stage": "baserow_checkins_write",
+  "replay_steps": ["upsert_checkin", "ensure_canonical_post", "ensure_event"],
+  "raw_submission": "- publish release notes @status:done ~30m"
+}

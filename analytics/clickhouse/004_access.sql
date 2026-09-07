@@ -1,0 +1,15 @@
+CREATE ROLE IF NOT EXISTS checkin_event_ingestor;
+CREATE ROLE IF NOT EXISTS checkin_superset_reader;
+
+GRANT INSERT, SELECT(event_id, payload_hash) ON checkin_analytics.checkin_events_raw TO checkin_event_ingestor;
+GRANT INSERT ON checkin_analytics.checkin_expectations_raw TO checkin_event_ingestor;
+
+GRANT SELECT ON checkin_analytics.checkin_submission_metrics_reporting TO checkin_superset_reader;
+GRANT SELECT ON checkin_analytics.checkin_rejection_rules_reporting TO checkin_superset_reader;
+GRANT SELECT ON checkin_analytics.checkin_event_health_reporting TO checkin_superset_reader;
+
+REVOKE ALL ON checkin_analytics.checkin_events_raw FROM checkin_superset_reader;
+REVOKE ALL ON checkin_analytics.checkin_expectations_raw FROM checkin_superset_reader;
+REVOKE ALL ON checkin_analytics.checkin_submission_metrics_archive FROM checkin_superset_reader;
+REVOKE ALL ON checkin_analytics.checkin_rejection_rules_archive FROM checkin_superset_reader;
+REVOKE ALL ON checkin_analytics.checkin_event_health_archive FROM checkin_superset_reader;

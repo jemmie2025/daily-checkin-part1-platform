@@ -1,0 +1,72 @@
+schema_version: 1
+
+metrics:
+  - name: checkin_gateway_requests_total
+    type: counter
+    labels: [route, outcome, status_class]
+  - name: checkin_gateway_duration_seconds
+    type: histogram
+    labels: [route, outcome]
+  - name: checkin_submission_durability_total
+    type: counter
+    labels: [result, failure_stage]
+  - name: checkin_compliance_runs_total
+    type: counter
+    labels: [result]
+  - name: checkin_compliance_last_success_timestamp_seconds
+    type: gauge
+    labels: [workflow]
+  - name: checkin_dlq_records
+    type: gauge
+    labels: [status, failure_stage]
+  - name: checkin_dlq_oldest_pending_age_seconds
+    type: gauge
+    labels: [failure_stage]
+  - name: checkin_event_ingestion_total
+    type: counter
+    labels: [result, event_name]
+  - name: checkin_event_ingestion_lag_seconds
+    type: histogram
+    labels: [event_name]
+  - name: checkin_vault_secret_age_days
+    type: gauge
+    labels: [secret_object]
+
+allowed_log_fields:
+  - timestamp
+  - level
+  - service
+  - environment
+  - correlation_id
+  - request_id
+  - execution_id
+  - event_id
+  - event_name
+  - route_id
+  - outcome
+  - status_code
+  - latency_ms
+  - failure_stage
+  - error_code
+
+forbidden_labels_and_log_fields:
+  - user_name
+  - user_id
+  - tasks
+  - tasks_md
+  - tasks_json
+  - proof_link
+  - proof_links
+  - raw_submission
+  - dialog_state
+  - nonce
+  - authorization
+  - token
+  - password
+  - secret
+
+cardinality_limits:
+  metric_series_per_metric: 5000
+  correlation_id_as_metric_label: false
+  request_id_as_metric_label: false
+  execution_id_as_metric_label: false

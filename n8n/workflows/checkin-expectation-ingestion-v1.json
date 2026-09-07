@@ -1,0 +1,179 @@
+{
+  "name": "Daily Check-in — Expectation Ingestion v1",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "9b385caf-b966-4b87-8d75-0db306bd63ee",
+      "name": "Every Hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.CHECKIN_ANALYTICS_EXPECTATIONS_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.CHECKIN_ANALYTICS_ROSTER_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "d8c1fa58-f19a-4ad1-b2cd-b8393b41679b",
+      "name": "Fetch Sanitized Expectations",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -240,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst rows = input.expectations ?? input.results ?? [];\nconst allowedStates = new Set(['expected', 'approved_leave', 'holiday', 'inactive']);\nconst allowedTypes = new Set(['SOD', 'EOD']);\nconst now = new Date().toISOString();\nreturn rows.map((row) => {\n  if (!allowedStates.has(row.attendance_state) || !allowedTypes.has(row.checkin_type)) {\n    throw new Error('invalid expectation contract');\n  }\n  for (const field of ['expectation_id', 'user_id', 'pod_id', 'timezone', 'cycle_date', 'sla_code', 'sla_due_at', 'roster_source_version']) {\n    if (!row[field]) throw new Error(`expectation missing ${field}`);\n  }\n  return {\n    json: {\n      expectation_id: row.expectation_id,\n      user_id: row.user_id,\n      pod_id: row.pod_id,\n      timezone: row.timezone,\n      cycle_date: row.cycle_date,\n      checkin_type: row.checkin_type,\n      sla_code: row.sla_code,\n      sla_due_at: row.sla_due_at,\n      attendance_state: row.attendance_state,\n      roster_source_version: row.roster_source_version,\n      updated_at: now,\n    },\n  };\n});"
+      },
+      "id": "8ff0c777-dcf7-450b-a101-b7f71362e98f",
+      "name": "Minimize Expectation Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CLICKHOUSE_HTTP_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-ClickHouse-User",
+              "value": "={{ $env.CHECKIN_CLICKHOUSE_INGEST_USER }}"
+            },
+            {
+              "name": "X-ClickHouse-Key",
+              "value": "={{ $env.CHECKIN_CLICKHOUSE_INGEST_KEY }}"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "database",
+              "value": "={{ $env.CLICKHOUSE_DATABASE }}"
+            },
+            {
+              "name": "insert_deduplication_token",
+              "value": "={{ $json.expectation_id + '|' + $json.roster_source_version }}"
+            },
+            {
+              "name": "query",
+              "value": "INSERT INTO checkin_expectations_raw FORMAT JSONEachRow"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/x-ndjson",
+        "body": "={{ JSON.stringify($json) + '\\n' }}",
+        "options": {
+          "timeout": 5000
+        }
+      },
+      "id": "76549e28-fdca-4ab9-8388-bfae01c15a9e",
+      "name": "Insert Expectation Rows",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    }
+  ],
+  "connections": {
+    "Every Hour": {
+      "main": [
+        [
+          {
+            "node": "Fetch Sanitized Expectations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Sanitized Expectations": {
+      "main": [
+        [
+          {
+            "node": "Minimize Expectation Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Minimize Expectation Rows": {
+      "main": [
+        [
+          {
+            "node": "Insert Expectation Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false,
+    "timezone": "UTC"
+  },
+  "active": false,
+  "versionId": "56fd10fa-ad73-4481-bfe0-1fa03eaf4565",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [
+    {
+      "name": "daily-checkin"
+    },
+    {
+      "name": "part-1"
+    },
+    {
+      "name": "analytics"
+    }
+  ]
+}

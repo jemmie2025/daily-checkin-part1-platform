@@ -1,0 +1,544 @@
+{
+  "name": "Daily Check-in — Event Ingestion v1",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "internal/checkin/events/v1",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "565b284d-71d8-489d-a5ec-5d9c8da13af8",
+      "name": "Receive Check-in Event",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -720,
+        0
+      ],
+      "webhookId": "778e9001-7fc7-4770-91fa-d162414777f4"
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst envelope = $input.first().json;\n\nfunction exactObject(value, required, optional = []) {\n  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('expected object');\n  const actual = Object.keys(value).sort();\n  const allowed = [...required, ...optional].sort();\n  if (actual.some((key) => !allowed.includes(key))) throw new Error('unknown object field');\n  if (required.some((key) => !Object.prototype.hasOwnProperty.call(value, key))) {\n    throw new Error('missing object field');\n  }\n}\n\nfunction stringField(value, name, minimum, maximum, pattern = null) {\n  if (typeof value !== 'string' || value.length < minimum || value.length > maximum) {\n    throw new Error(`${name} has invalid length`);\n  }\n  if (pattern && !pattern.test(value)) throw new Error(`${name} has invalid format`);\n}\n\nfunction integerField(value, name, minimum, maximum = Number.MAX_SAFE_INTEGER) {\n  if (!Number.isInteger(value) || value < minimum || value > maximum) {\n    throw new Error(`${name} must be an integer in range`);\n  }\n}\n\nfunction validDate(value) {\n  if (typeof value !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return false;\n  const [year, month, day] = value.split('-').map(Number);\n  const parsed = new Date(Date.UTC(year, month - 1, day));\n  return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day;\n}\n\nfunction validateAndFlatten(event) {\n  exactObject(event, [\n    'correlation_id', 'cycle', 'dialog_version', 'event_id', 'event_name', 'event_version',\n    'occurred_at', 'outcome', 'pod', 'source', 'trace', 'user',\n  ]);\n\n  const forbidden = new Set([\n    'user_name', 'tasks', 'tasks_md', 'tasks_json', 'proof_link', 'proof_links',\n    'raw_submission', 'state', 'nonce', 'token',\n  ]);\n  function walk(value) {\n    if (Array.isArray(value)) return value.forEach(walk);\n    if (!value || typeof value !== 'object') return;\n    for (const [key, child] of Object.entries(value)) {\n      if (forbidden.has(key)) throw new Error('event contains forbidden private fields');\n      walk(child);\n    }\n  }\n  walk(event);\n\n  stringField(event.event_id, 'event_id', 36, 36, /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);\n  if (!['checkin.opened', 'checkin.submitted', 'checkin.rejected', 'checkin.cancelled'].includes(event.event_name)) {\n    throw new Error('unsupported event_name');\n  }\n  if (event.event_version !== 1 || event.dialog_version !== 'checkin_v1') {\n    throw new Error('unsupported event version');\n  }\n  stringField(event.occurred_at, 'occurred_at', 20, 40, /(?:Z|[+-]\\d{2}:\\d{2})$/);\n  if (Number.isNaN(Date.parse(event.occurred_at))) throw new Error('occurred_at must be RFC3339');\n  stringField(event.correlation_id, 'correlation_id', 8, 128, /^[A-Za-z0-9._:-]+$/);\n  if (!['apisix_telemetry', 'n8n_submit_handler'].includes(event.source)) throw new Error('unsupported source');\n\n  exactObject(event.user, ['user_id']);\n  stringField(event.user.user_id, 'user.user_id', 1, 128);\n  exactObject(event.pod, ['pod_id']);\n  stringField(event.pod.pod_id, 'pod.pod_id', 1, 128);\n  exactObject(event.cycle, ['cycle_date', 'checkin_type', 'sla_code']);\n  if (!validDate(event.cycle.cycle_date)) throw new Error('cycle.cycle_date must be a real date');\n  if (!['SOD', 'EOD', 'ADHOC'].includes(event.cycle.checkin_type)) throw new Error('invalid checkin_type');\n  stringField(event.cycle.sla_code, 'cycle.sla_code', 1, 128);\n\n  exactObject(event.outcome, ['latency_ms'], [\n    'sla_status', 'task_count', 'done_count', 'blocked_count', 'has_proof', 'rule_ids',\n  ]);\n  integerField(event.outcome.latency_ms, 'outcome.latency_ms', 0);\n  if (event.outcome.sla_status !== undefined && !['on_time', 'late'].includes(event.outcome.sla_status)) {\n    throw new Error('invalid sla_status');\n  }\n  for (const name of ['task_count', 'done_count', 'blocked_count']) {\n    if (event.outcome[name] !== undefined) integerField(event.outcome[name], `outcome.${name}`, 0, 20);\n  }\n  if (event.outcome.has_proof !== undefined && typeof event.outcome.has_proof !== 'boolean') {\n    throw new Error('outcome.has_proof must be boolean');\n  }\n  if (event.outcome.rule_ids !== undefined) {\n    const ids = event.outcome.rule_ids;\n    if (!Array.isArray(ids) || ids.length < 1 || ids.some((id) => typeof id !== 'string' || !/^(FMT-[1-8]|PI-[0-9]+)$/.test(id))) {\n      throw new Error('outcome.rule_ids is invalid');\n    }\n    if (new Set(ids).size !== ids.length) throw new Error('outcome.rule_ids must be unique');\n  }\n\n  exactObject(event.trace, ['request_id'], ['execution_id']);\n  stringField(event.trace.request_id, 'trace.request_id', 8, 128);\n  if (event.trace.execution_id !== undefined) stringField(event.trace.execution_id, 'trace.execution_id', 1, 128);\n\n  if (event.event_name === 'checkin.opened' && event.source !== 'apisix_telemetry') {\n    throw new Error('opened events must come from APISIX telemetry');\n  }\n  if (event.event_name === 'checkin.submitted') {\n    if (event.source !== 'n8n_submit_handler') throw new Error('submitted event source is invalid');\n    for (const field of ['sla_status', 'task_count', 'done_count', 'blocked_count', 'has_proof']) {\n      if (event.outcome[field] === undefined) throw new Error(`submitted outcome missing ${field}`);\n    }\n    if (event.outcome.done_count + event.outcome.blocked_count > event.outcome.task_count) {\n      throw new Error('submitted outcome counts exceed task_count');\n    }\n    if (Object.keys(event.outcome).length !== 6) throw new Error('submitted outcome has invalid fields');\n  }\n  if (event.event_name === 'checkin.rejected') {\n    if (event.source !== 'n8n_submit_handler') throw new Error('rejected event source is invalid');\n    if (event.outcome.rule_ids === undefined) throw new Error('rejected outcome missing rule_ids');\n    if (Object.keys(event.outcome).length !== 2) throw new Error('rejected outcome has invalid fields');\n  }\n  if (event.event_name === 'checkin.cancelled') {\n    if (event.source !== 'n8n_submit_handler') throw new Error('cancelled event source is invalid');\n    if (Object.keys(event.outcome).length !== 1) throw new Error('cancelled outcome has invalid fields');\n  }\n  if (event.event_name === 'checkin.opened' && Object.keys(event.outcome).length !== 1) {\n    throw new Error('opened outcome has invalid fields');\n  }\n\n  const canonicalize = (value) => {\n    if (Array.isArray(value)) return value.map(canonicalize);\n    if (!value || typeof value !== 'object') return value;\n    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalize(value[key])]));\n  };\n  const payloadHash = crypto.createHash('sha256').update(JSON.stringify(canonicalize(event))).digest('hex');\n  return {\n    event_id: event.event_id,\n    event_name: event.event_name,\n    event_version: event.event_version,\n    occurred_at: event.occurred_at,\n    correlation_id: event.correlation_id,\n    source: event.source,\n    user_id: event.user.user_id,\n    pod_id: event.pod.pod_id,\n    cycle_date: event.cycle.cycle_date,\n    checkin_type: event.cycle.checkin_type,\n    sla_code: event.cycle.sla_code,\n    dialog_version: event.dialog_version,\n    latency_ms: event.outcome.latency_ms,\n    sla_status: event.outcome.sla_status ?? null,\n    task_count: event.outcome.task_count ?? null,\n    done_count: event.outcome.done_count ?? null,\n    blocked_count: event.outcome.blocked_count ?? null,\n    has_proof: event.outcome.has_proof ?? null,\n    rule_ids: event.outcome.rule_ids ?? [],\n    request_id: event.trace.request_id,\n    execution_id: event.trace.execution_id ?? null,\n    payload_hash: payloadHash,\n  };\n}\n\nconst supplied = String(envelope.headers?.authorization ?? '').replace(/^Bearer\\s+/i, '');\nconst expected = String($env.CHECKIN_EVENT_INGEST_TOKEN ?? '');\nconst suppliedBytes = Buffer.from(supplied);\nconst expectedBytes = Buffer.from(expected);\nif (!expected || suppliedBytes.length !== expectedBytes.length || !crypto.timingSafeEqual(suppliedBytes, expectedBytes)) {\n  return [{ json: { disposition: 'unauthorized', error_code: 'UNAUTHORIZED' } }];\n}\n\ntry {\n  const incoming = validateAndFlatten(envelope.body);\n  return [{ json: { disposition: 'valid', incoming } }];\n} catch (_error) {\n  return [{ json: { disposition: 'invalid', error_code: 'INVALID_EVENT_CONTRACT' } }];\n}"
+      },
+      "id": "83a69f47-0ee7-411b-a4fd-81060537460d",
+      "name": "Validate and Flatten Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.disposition }}",
+                    "rightValue": "valid",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "valid"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.disposition }}",
+                    "rightValue": "unauthorized",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "unauthorized"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.disposition }}",
+                    "rightValue": "invalid",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "invalid"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "94b56965-5f07-4e2b-a35a-9fd5d401307a",
+      "name": "Route Validation",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CLICKHOUSE_HTTP_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-ClickHouse-User",
+              "value": "={{ $env.CHECKIN_CLICKHOUSE_INGEST_USER }}"
+            },
+            {
+              "name": "X-ClickHouse-Key",
+              "value": "={{ $env.CHECKIN_CLICKHOUSE_INGEST_KEY }}"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "database",
+              "value": "={{ $env.CLICKHOUSE_DATABASE }}"
+            },
+            {
+              "name": "param_event_id",
+              "value": "={{ $json.incoming.event_id }}"
+            },
+            {
+              "name": "query",
+              "value": "SELECT payload_hash FROM checkin_events_raw FINAL WHERE event_id = {event_id:UUID} FORMAT JSON"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 5000
+        }
+      },
+      "id": "cdf48e20-0016-491b-84d4-7a68dc135fa6",
+      "name": "Check Event ID",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        -160
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "jsCode": "const existing = $input.first().json;\nconst incoming = $('Validate and Flatten Event').item.json.incoming;\nconst rows = existing.data ?? existing.rows ?? existing;\nconst first = Array.isArray(rows) ? rows[0] : null;\nif (!first) return [{ json: { disposition: 'new', incoming } }];\nif (first.payload_hash !== incoming.payload_hash) {\n  return [{ json: { disposition: 'conflict', event_id: incoming.event_id } }];\n}\nreturn [{ json: { disposition: 'duplicate', event_id: incoming.event_id } }];"
+      },
+      "id": "124b53fd-10a5-49c6-9fb6-2b9e736abf27",
+      "name": "Classify Event ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.disposition }}",
+                    "rightValue": "new",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "new"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.disposition }}",
+                    "rightValue": "duplicate",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "duplicate"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.disposition }}",
+                    "rightValue": "conflict",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "conflict"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "848172ba-10d2-4013-9e16-d73b7dba010a",
+      "name": "Route Disposition",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        480,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CLICKHOUSE_HTTP_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-ClickHouse-User",
+              "value": "={{ $env.CHECKIN_CLICKHOUSE_INGEST_USER }}"
+            },
+            {
+              "name": "X-ClickHouse-Key",
+              "value": "={{ $env.CHECKIN_CLICKHOUSE_INGEST_KEY }}"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "database",
+              "value": "={{ $env.CLICKHOUSE_DATABASE }}"
+            },
+            {
+              "name": "insert_deduplication_token",
+              "value": "={{ $json.incoming.event_id }}"
+            },
+            {
+              "name": "query",
+              "value": "INSERT INTO checkin_events_raw FORMAT JSONEachRow"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/x-ndjson",
+        "body": "={{ JSON.stringify($json.incoming) + '\\n' }}",
+        "options": {
+          "timeout": 5000
+        }
+      },
+      "id": "e5c6c45f-f1e0-427f-8929-8263232e8f91",
+      "name": "Insert Event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        -300
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {status: 'accepted', event_id: $('Classify Event ID').item.json.incoming.event_id} }}",
+        "options": {
+          "responseCode": 202
+        }
+      },
+      "id": "68ce94f8-f68f-4ff4-8f2d-8ed4838ac053",
+      "name": "Respond Accepted",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        960,
+        -300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {status: 'duplicate', event_id: $json.event_id} }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "4e9a4ef2-8495-4bb3-923e-cf364fe21bd5",
+      "name": "Respond Duplicate",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        720,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {status: 'conflict', event_id: $json.event_id, error: 'event_id already exists with different payload'} }}",
+        "options": {
+          "responseCode": 409
+        }
+      },
+      "id": "75108f21-4379-488c-9d0e-3fb510b1d861",
+      "name": "Respond Conflict",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        720,
+        -20
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {status: 'unauthorized', error: 'producer authentication failed'} }}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "id": "845d9862-8778-49fa-862b-8bca0a20c0d0",
+      "name": "Respond Unauthorized",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {status: 'invalid', error: 'event does not match checkin-event.v1'} }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "8ddc3070-185d-4af9-af55-2f70f770a80e",
+      "name": "Respond Invalid",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        220
+      ]
+    }
+  ],
+  "connections": {
+    "Receive Check-in Event": {
+      "main": [
+        [
+          {
+            "node": "Validate and Flatten Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate and Flatten Event": {
+      "main": [
+        [
+          {
+            "node": "Route Validation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Validation": {
+      "main": [
+        [
+          {
+            "node": "Check Event ID",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Unauthorized",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Invalid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Event ID": {
+      "main": [
+        [
+          {
+            "node": "Classify Event ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Event ID": {
+      "main": [
+        [
+          {
+            "node": "Route Disposition",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Disposition": {
+      "main": [
+        [
+          {
+            "node": "Insert Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Conflict",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Event": {
+      "main": [
+        [
+          {
+            "node": "Respond Accepted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false,
+    "timezone": "UTC"
+  },
+  "active": false,
+  "versionId": "5b15c912-4274-49b7-9874-2805d69549d0",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [
+    {
+      "name": "daily-checkin"
+    },
+    {
+      "name": "part-1"
+    },
+    {
+      "name": "analytics"
+    }
+  ]
+}

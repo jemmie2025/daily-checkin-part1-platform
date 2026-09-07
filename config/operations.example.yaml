@@ -1,0 +1,59 @@
+config_version: 1
+environment: example
+
+runtime:
+  n8n_minimum_version: "2.36.0"
+  timezone: UTC
+  code_builtin_modules:
+    - crypto
+  external_modules: []
+  success_execution_retention: none
+  error_execution_retention_days: 30
+
+compliance:
+  schedule_minutes: 5
+  nudge_before_sla_minutes: 60
+  escalation_after_sla_hours: 24
+  weekly_rollup_day: Monday
+  weekly_rollup_hour_utc: 9
+  violation_rule_id: PI-6
+  snapshot_contract: compliance-snapshot.v1
+  action_state_limit: 10000
+
+reliability:
+  total_attempts: 3
+  delays_after_failed_attempt_seconds:
+    - 1
+    - 4
+  dlq_first_replay_after_seconds: 16
+  failed_execution_reconciliation_minutes: 5
+  failed_execution_page_size: 100
+  n8n_api_required_scope: execution:read
+  replay_scan_minutes: 15
+  replay_lease_minutes: 15
+  replay_batch_size: 25
+  resolved_retention_days: 30
+
+analytics:
+  database: checkin_analytics
+  detail_retention_months: 24
+  aggregate_archive_after_months: 23
+  aggregate_archive_refresh_hour_utc: 2
+  aggregate_retention: indefinite
+  event_table: checkin_events_raw
+  expectation_table: checkin_expectations_raw
+  event_id_conflict_policy: reject
+  duplicate_policy: same_id_same_hash_returns_200
+  dashboard_slug: daily_checkin_compliance_v1
+
+privacy:
+  clickhouse_forbidden_fields:
+    - user_name
+    - tasks_md
+    - tasks_json
+    - proof_links
+    - raw_submission
+    - nonce
+    - state
+  dlq_raw_submission_logging: forbidden
+  dm_verbatim_copy: required

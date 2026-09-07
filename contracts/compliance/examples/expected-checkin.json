@@ -1,0 +1,13 @@
+{
+  "expectation_id": "mm-user-1003|2026-09-04|EOD|NAILS-POD-EOD",
+  "user_id": "mm-user-1003",
+  "user_name": "Example User",
+  "pod_id": "pod-nails-squad",
+  "timezone": "Africa/Lagos",
+  "cycle_date": "2026-09-04",
+  "checkin_type": "EOD",
+  "sla_code": "NAILS-POD-EOD",
+  "sla_due_at": "2026-09-04T16:00:00Z",
+  "attendance_state": "expected",
+  "roster_source_version": "compliance-source-2026-09-04T06:00:00Z"
+}

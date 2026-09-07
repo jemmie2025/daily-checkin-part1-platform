@@ -1,0 +1,62 @@
+schema_version: 1
+scope: part-1-only
+
+tables:
+  checkin_violations:
+    contract: contracts/baserow/checkin-violation.v1.schema.json
+    idempotency_field: violation_id
+    writer: n8n-compliance
+    fields:
+      violation_id:
+        type: text
+        unique: true
+      rule_id: text
+      rule_name: text
+      user_id: text
+      user_name: text
+      pod_id: text
+      cycle_date: date
+      checkin_type: single_select
+      sla_code: text
+      sla_due_at: date_time
+      detected_at: date_time
+      status: single_select
+      evidence_json: long_text
+      workflow_execution_id: text
+      resolved_at: date_time
+      resolved_by_checkin_id: text
+      waiver_reason: long_text
+
+  checkin_dlq:
+    contract: contracts/baserow/checkin-dlq.v1.schema.json
+    idempotency_field: dlq_id
+    writer: n8n-dlq
+    restricted_fields:
+      - raw_submission
+    fields:
+      dlq_id:
+        type: text
+        unique: true
+      replay_key: text
+      source_workflow: text
+      source_execution_id: text
+      correlation_id: text
+      user_id: text
+      pod_id: text
+      cycle_date: date
+      checkin_type: single_select
+      failure_stage: single_select
+      attempt_count: number
+      status: single_select
+      last_error_code: text
+      last_error_summary: long_text
+      raw_submission: long_text
+      created_at: date_time
+      next_retry_at: date_time
+      dm_notified_at: date_time
+      resolved_at: date_time
+      resolved_checkin_id: text
+      replay_started_at: date_time
+      replay_owner: text
+      replay_attempt_count: number
+      retention_delete_after: date_time

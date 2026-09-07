@@ -1,0 +1,272 @@
+{
+  "name": "Daily Check-in — Event Ingestion v1",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "internal/checkin/events/v1",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "565b284d-71d8-489d-a5ec-5d9c8da13af8",
+      "name": "Receive Check-in Event",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [-720, 0],
+      "webhookId": "778e9001-7fc7-4770-91fa-d162414777f4"
+    },
+    {
+      "parameters": {"jsCode": "@code:event-normalizer.js"},
+      "id": "83a69f47-0ee7-411b-a4fd-81060537460d",
+      "name": "Validate and Flatten Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-480, 0]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2},
+                "conditions": [{"leftValue": "={{ $json.disposition }}", "rightValue": "valid", "operator": {"type": "string", "operation": "equals"}}],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "valid"
+            },
+            {
+              "conditions": {
+                "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2},
+                "conditions": [{"leftValue": "={{ $json.disposition }}", "rightValue": "unauthorized", "operator": {"type": "string", "operation": "equals"}}],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "unauthorized"
+            },
+            {
+              "conditions": {
+                "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2},
+                "conditions": [{"leftValue": "={{ $json.disposition }}", "rightValue": "invalid", "operator": {"type": "string", "operation": "equals"}}],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "invalid"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "94b56965-5f07-4e2b-a35a-9fd5d401307a",
+      "name": "Route Validation",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [-240, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CLICKHOUSE_HTTP_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "X-ClickHouse-User", "value": "={{ $env.CHECKIN_CLICKHOUSE_INGEST_USER }}"},
+            {"name": "X-ClickHouse-Key", "value": "={{ $env.CHECKIN_CLICKHOUSE_INGEST_KEY }}"}
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {"name": "database", "value": "={{ $env.CLICKHOUSE_DATABASE }}"},
+            {"name": "param_event_id", "value": "={{ $json.incoming.event_id }}"},
+            {"name": "query", "value": "SELECT payload_hash FROM checkin_events_raw FINAL WHERE event_id = {event_id:UUID} FORMAT JSON"}
+          ]
+        },
+        "options": {
+          "response": {"response": {"responseFormat": "json"}},
+          "timeout": 5000
+        }
+      },
+      "id": "cdf48e20-0016-491b-84d4-7a68dc135fa6",
+      "name": "Check Event ID",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [0, -160],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {"jsCode": "@code:duplicate-decider.js"},
+      "id": "124b53fd-10a5-49c6-9fb6-2b9e736abf27",
+      "name": "Classify Event ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, -160]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2},
+                "conditions": [{"leftValue": "={{ $json.disposition }}", "rightValue": "new", "operator": {"type": "string", "operation": "equals"}}],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "new"
+            },
+            {
+              "conditions": {
+                "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2},
+                "conditions": [{"leftValue": "={{ $json.disposition }}", "rightValue": "duplicate", "operator": {"type": "string", "operation": "equals"}}],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "duplicate"
+            },
+            {
+              "conditions": {
+                "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2},
+                "conditions": [{"leftValue": "={{ $json.disposition }}", "rightValue": "conflict", "operator": {"type": "string", "operation": "equals"}}],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "conflict"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "848172ba-10d2-4013-9e16-d73b7dba010a",
+      "name": "Route Disposition",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [480, -160]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CLICKHOUSE_HTTP_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "X-ClickHouse-User", "value": "={{ $env.CHECKIN_CLICKHOUSE_INGEST_USER }}"},
+            {"name": "X-ClickHouse-Key", "value": "={{ $env.CHECKIN_CLICKHOUSE_INGEST_KEY }}"}
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {"name": "database", "value": "={{ $env.CLICKHOUSE_DATABASE }}"},
+            {"name": "insert_deduplication_token", "value": "={{ $json.incoming.event_id }}"},
+            {"name": "query", "value": "INSERT INTO checkin_events_raw FORMAT JSONEachRow"}
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/x-ndjson",
+        "body": "={{ JSON.stringify($json.incoming) + '\\n' }}",
+        "options": {"timeout": 5000}
+      },
+      "id": "e5c6c45f-f1e0-427f-8929-8263232e8f91",
+      "name": "Insert Event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [720, -300],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {status: 'accepted', event_id: $('Classify Event ID').item.json.incoming.event_id} }}",
+        "options": {"responseCode": 202}
+      },
+      "id": "68ce94f8-f68f-4ff4-8f2d-8ed4838ac053",
+      "name": "Respond Accepted",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [960, -300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {status: 'duplicate', event_id: $json.event_id} }}",
+        "options": {"responseCode": 200}
+      },
+      "id": "4e9a4ef2-8495-4bb3-923e-cf364fe21bd5",
+      "name": "Respond Duplicate",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [720, -160]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {status: 'conflict', event_id: $json.event_id, error: 'event_id already exists with different payload'} }}",
+        "options": {"responseCode": 409}
+      },
+      "id": "75108f21-4379-488c-9d0e-3fb510b1d861",
+      "name": "Respond Conflict",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [720, -20]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {status: 'unauthorized', error: 'producer authentication failed'} }}",
+        "options": {"responseCode": 401}
+      },
+      "id": "845d9862-8778-49fa-862b-8bca0a20c0d0",
+      "name": "Respond Unauthorized",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [0, 80]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {status: 'invalid', error: 'event does not match checkin-event.v1'} }}",
+        "options": {"responseCode": 400}
+      },
+      "id": "8ddc3070-185d-4af9-af55-2f70f770a80e",
+      "name": "Respond Invalid",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [0, 220]
+    }
+  ],
+  "connections": {
+    "Receive Check-in Event": {"main": [[{"node": "Validate and Flatten Event", "type": "main", "index": 0}]]},
+    "Validate and Flatten Event": {"main": [[{"node": "Route Validation", "type": "main", "index": 0}]]},
+    "Route Validation": {"main": [
+      [{"node": "Check Event ID", "type": "main", "index": 0}],
+      [{"node": "Respond Unauthorized", "type": "main", "index": 0}],
+      [{"node": "Respond Invalid", "type": "main", "index": 0}]
+    ]},
+    "Check Event ID": {"main": [[{"node": "Classify Event ID", "type": "main", "index": 0}]]},
+    "Classify Event ID": {"main": [[{"node": "Route Disposition", "type": "main", "index": 0}]]},
+    "Route Disposition": {"main": [
+      [{"node": "Insert Event", "type": "main", "index": 0}],
+      [{"node": "Respond Duplicate", "type": "main", "index": 0}],
+      [{"node": "Respond Conflict", "type": "main", "index": 0}]
+    ]},
+    "Insert Event": {"main": [[{"node": "Respond Accepted", "type": "main", "index": 0}]]}
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false,
+    "timezone": "UTC"
+  },
+  "active": false,
+  "versionId": "5b15c912-4274-49b7-9874-2805d69549d0",
+  "meta": {"templateCredsSetupCompleted": true},
+  "tags": [{"name": "daily-checkin"}, {"name": "part-1"}, {"name": "analytics"}]
+}

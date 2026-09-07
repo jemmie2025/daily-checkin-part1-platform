@@ -1,0 +1,59 @@
+table_name: checkin_submission_metrics_reporting
+schema: checkin_analytics
+database_uuid: 9bb1d984-e169-4454-9842-81d876cc1943
+main_dttm_col: cycle_date
+description: Deduplicated recent metrics plus aggregate-only history beyond the detail-retention window.
+default_endpoint: null
+offset: 0
+cache_timeout: 300
+catalog: null
+columns:
+  - column_name: cycle_date
+    is_dttm: true
+    type: DATE
+  - column_name: pod_id
+    type: STRING
+  - column_name: checkin_type
+    type: STRING
+  - column_name: expected_count
+    type: BIGINT
+  - column_name: submitted_count
+    type: BIGINT
+  - column_name: missing_count
+    type: BIGINT
+  - column_name: submission_rate
+    type: FLOAT
+  - column_name: on_time_count
+    type: BIGINT
+  - column_name: late_count
+    type: BIGINT
+  - column_name: proof_attach_rate
+    type: FLOAT
+  - column_name: blocked_task_count
+    type: BIGINT
+  - column_name: median_submit_latency_ms
+    type: FLOAT
+metrics:
+  - metric_name: expected_checkins
+    expression: SUM(expected_count)
+    metric_type: sum
+  - metric_name: submitted_checkins
+    expression: SUM(submitted_count)
+    metric_type: sum
+  - metric_name: missing_checkins
+    expression: SUM(missing_count)
+    metric_type: sum
+  - metric_name: submission_rate_percent
+    expression: 100.0 * SUM(submitted_count) / nullIf(SUM(expected_count), 0)
+    metric_type: ratio
+  - metric_name: proof_attach_rate_percent
+    expression: 100.0 * AVG(proof_attach_rate)
+    metric_type: avg
+  - metric_name: blocked_tasks
+    expression: SUM(blocked_task_count)
+    metric_type: sum
+  - metric_name: median_submit_latency_ms
+    expression: quantileExact(0.5)(median_submit_latency_ms)
+    metric_type: median
+uuid: bbf089b7-d3b3-46f2-9515-f964278cdd2b
+version: 1.0.0

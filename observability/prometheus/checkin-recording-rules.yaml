@@ -1,0 +1,14 @@
+groups:
+  - name: daily-checkin-recording
+    interval: 30s
+    rules:
+      - record: checkin:open_success_ratio_5m
+        expr: sum(rate(checkin_gateway_requests_total{route="open",outcome="opened"}[5m])) / clamp_min(sum(rate(checkin_gateway_requests_total{route="open"}[5m])), 0.000001)
+      - record: checkin:open_under_2s_ratio_5m
+        expr: sum(rate(checkin_gateway_duration_seconds_bucket{route="open",le="2"}[5m])) / clamp_min(sum(rate(checkin_gateway_duration_seconds_count{route="open"}[5m])), 0.000001)
+      - record: checkin:submission_durable_ratio_30m
+        expr: sum(increase(checkin_submission_durability_total{result=~"stored|dlq_captured"}[30m])) / clamp_min(sum(increase(checkin_submission_durability_total[30m])), 1)
+      - record: checkin:compliance_on_time_ratio_30m
+        expr: sum(increase(checkin_compliance_runs_total{result="success"}[30m])) / clamp_min(sum(increase(checkin_compliance_runs_total[30m])), 1)
+      - record: checkin:analytics_fresh_ratio_15m
+        expr: sum(rate(checkin_event_ingestion_lag_seconds_bucket{le="300"}[15m])) / clamp_min(sum(rate(checkin_event_ingestion_lag_seconds_count[15m])), 0.000001)
