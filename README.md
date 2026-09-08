@@ -1,148 +1,102 @@
 # Daily Check-in Platform — Part 1
 
-[![Contract validation](https://img.shields.io/badge/contracts-validated-1f883d)](#local-validation)
-[![Phase](https://img.shields.io/badge/phases%201--4-locally%20validated-0969da)](docs/phase-plan.md)
-[![Secrets](https://img.shields.io/badge/secrets-Vault%20only-8250df)](SECURITY.md)
+[![Validate Part 1 contracts](https://github.com/jemmie2025/daily-checkin-part1-platform/actions/workflows/validate.yml/badge.svg?branch=main)](https://github.com/jemmie2025/daily-checkin-part1-platform/actions/workflows/validate.yml)
+[![Security gates](https://github.com/jemmie2025/daily-checkin-part1-platform/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/jemmie2025/daily-checkin-part1-platform/actions/workflows/security.yml)
+[![Checkpoint](https://img.shields.io/badge/checkpoint-v0.5.0-0969da)](docs/phase-plan.md)
 
-Configuration-first implementation for Task #5585: contracts and integration
-overlays for the company-managed APISIX, Vault, Nomad, Consul, n8n, Baserow,
-ClickHouse, Loki, and Grafana services. Company-environment application and live
-evidence require the access listed in
-[`docs/access-required.md`](docs/access-required.md).
+Configuration-first delivery for Task #5585. This repository configures the
+company-managed APISIX, Vault, Nomad, Consul, n8n, Baserow, ClickHouse, Loki,
+and Grafana services; it does not provision or replace them. Superset, Strapi,
+and Airflow are not used.
 
-This repository is contract-first. Part 1 and Part 2 can be implemented and
-tested independently against versioned interfaces; neither workstream needs to
-edit the other workstream's implementation.
+## Integration architecture
 
-## Part 1 ownership
-
-Part 1 owns:
-
-- APISIX route/plugin configuration, allowlisting, per-user throttling, and request-size controls.
-- Vault/Nomad workload bindings and runtime secret delivery on the existing platform.
-- SLA reminders, violation detection, escalation, and weekly compliance rollups.
-- Durable retry, dead-letter capture, replay, and failed-submission notification.
-- Privacy-minimized ClickHouse ingestion and Grafana reporting configuration.
-- Operational telemetry, security controls, production tests, and runbooks.
-
-Part 1 does **not** write to `checkins`, open the Mattermost dialog, validate
-FMT-1–FMT-8, or create canonical channel posts. Those operations remain behind
-the Part 2 boundary defined in [`contracts/ownership.yaml`](contracts/ownership.yaml).
-
-## Non-negotiable invariants
-
-| ID | Invariant |
-|---|---|
-| INV-01 | `/webhook/checkin/open` returns HTTP 200 within 2 seconds. |
-| INV-02 | The Open Handler performs no application-database writes. |
-| INV-03 | Only the Submit Handler writes `checkins`. |
-| INV-04 | Only the Compliance Worker writes `checkin_violations`. |
-| INV-05 | Only the Submit Error Workflow writes `checkin_dlq`. |
-| INV-06 | Rejected submissions never reach Baserow and never post to a pod channel. |
-| INV-07 | Telemetry contains no raw tasks, proof URLs, usernames, or verbatim submissions. |
-| INV-08 | Every replay is idempotent and traceable to its original failed execution. |
-
-## Architecture decisions already resolved
-
-Ten ambiguous areas in the master plan are resolved explicitly, including:
-
-1. Missing submissions exist only in `checkin_violations`; no synthetic
-   `checkins` row is created.
-2. `checkin.opened` is produced asynchronously from APISIX access telemetry,
-   preserving the Open Handler's no-write and latency guarantees.
-3. n8n's execution store is the durable first failure boundary; the Baserow
-   `checkin_dlq` table is the operational audit and replay surface. This avoids
-   losing submissions when Baserow itself is unavailable.
-4. Separate Baserow identities preserve the three exclusive writer boundaries.
-5. Analytics events are versioned and exclude raw work content.
-6. Vault runtime resolution is distinguished from dynamically issued credentials.
-7. Six distinct Nomad task identities enforce real Vault isolation; separate
-   policy names inside one n8n process are explicitly insufficient.
-8. DLQ replay resumes at the failed side effect and a scheduled reconciliation
-   pass mirrors failures that occurred while Baserow was unavailable.
-9. ClickHouse rejects conflicting event IDs, deduplicates at ingest and query
-   time, expires detail after 24 months, and retains aggregate-only history.
-10. Existing company platforms are reused; n8n provides lightweight DAG
-    orchestration, ClickHouse is the analytics/audit destination, Grafana is the
-    reporting surface, and neither Airflow nor Superset is introduced.
-
-See [`docs/adr`](docs/adr) for the full rationale and consequences.
-The folder-by-folder ownership map is in
-[`docs/folder-structure.md`](docs/folder-structure.md).
-
-## Repository map
-
-```text
-.
-├── config/                 Non-secret system defaults
-├── apisix/                 Custom gateway plugin and installation guidance
-├── baserow/                Part 1 field map and uniqueness requirements
-├── checkin_platform/       Executable compliance/reliability reference models
-├── contracts/              Versioned ownership, data, and event contracts
-│   ├── baserow/            Logical record schemas
-│   ├── compliance/         Snapshot and expectation contracts
-│   ├── events/             ClickHouse event schema and examples
-│   └── reliability/        Failure and replay contracts
-├── n8n/                    Reviewed code, templates, and importable workflows
-├── analytics/              ClickHouse contracts and Grafana configuration
-├── observability/          Metric contract, recording rules, and alerts
-├── load/                   k6 performance and gateway-control tests
-├── security/               Gitleaks, Strix, and passive ZAP security gates
-├── docs/                   Architecture, phases, ADRs, and runbooks
-│   └── adr/                Architecture decision records
-├── vault/                  Generated policies, roles, inventory, and task fragments
-├── release/                Immutable manifest and readiness evidence index
-├── scripts/                Renderers, deployers, packagers, and validation
-├── tests/                  Automated contract, runtime, security, and policy tests
-└── .github/workflows/      Least-privilege CI quality gate
+```mermaid
+flowchart TD
+  MM["Mattermost"] --> GW["Existing APISIX"]
+  GW --> P2["Part 2 n8n Open and Submit"]
+  P2 --> BR["Baserow operational records"]
+  P2 -- "versioned events" --> P1["Part 1 n8n workflows"]
+  P1 --> CH["ClickHouse analytics and audit"]
+  CH --> GF["Existing Grafana"]
+  P1 -. "failed writes" .-> DLQ["DLQ capture and replay"]
 ```
 
-## Local validation
+The request path is independent of analytics. ClickHouse or Grafana failure
+cannot prevent an otherwise valid check-in from being accepted. Baserow remains
+the operational source; ClickHouse is the final privacy-safe analytics and audit
+destination.
 
-Use Python 3.11+ and Node.js 20+ (Node runs the n8n Code-node fixtures). The
-only Python development dependency is pinned YAML parsing.
+## Part 1 configuration
+
+| Area | Configuration delivered |
+|---|---|
+| APISIX | Separate POST-only Open and Submit routes, Nomad CIDR allowlist, 64 KiB body limit, distributed 10 requests/minute per-user rate limit, TLS, privacy-safe logs, and sub-two-second Open timeouts |
+| Vault/Nomad | Exact-path KV v2 policies under `kv/n8n/mattermost/checkin`, claim-bound workload roles, isolated task identities, runtime templates, and rotation-aware secret delivery |
+| Compliance | SLA −60 minute nudge, SLA breach PI-6 violation, SLA +24 hour pod digest, weekly rollup, timezone conversion, leave/holiday suppression, and deterministic idempotency |
+| DLQ | Three bounded write attempts, durable n8n failure retention, `checkin_dlq` mirror, verbatim private user DM, five-minute reconciliation, leased replay, and resume-from-failed-stage recovery |
+| ClickHouse/Grafana | Authenticated event ingestion, schema validation, deduplication, 24-month detail retention, aggregate history, security-definer reporting views, and a six-panel Grafana dashboard |
+| Observability | Privacy-safe metrics, Loki-compatible logs, five SLOs, recording rules, nine owned alerts, and operational runbooks |
+| Security | Full-history Gitleaks scanning, authorised-target Strix testing, passive ZAP checks, SHA-pinned GitHub Actions, and least-privilege CI permissions |
+
+## Ownership and write boundaries
+
+- Tan's Part 2 owns the Mattermost `/ci` dialog, Open and Submit Handlers,
+  FMT-1–FMT-8 validation, `checkins` persistence, and threaded channel posting.
+- Part 1 consumes Part 2's versioned accepted-event contracts; neither part
+  edits the other part's implementation.
+- The Open Handler performs no application writes and must return HTTP 200
+  within two seconds.
+- Only Submit writes `checkins`; only Compliance writes
+  `checkin_violations`; only the Submit Error Workflow writes `checkin_dlq`.
+- Rejected submissions never reach Baserow or the pod channel.
+
+The authoritative boundary is
+[`contracts/ownership.yaml`](contracts/ownership.yaml).
+
+## DLQ and ClickHouse data policy
+
+After three failed attempts, n8n retains the complete failed execution. The DLQ
+workflow sends the user's input privately, mirrors the failure to Baserow when
+available, and replays only the failed side effect with the original correlation
+and idempotency keys.
+
+ClickHouse receives opened, submitted, rejected and cancelled events; expected
+check-in facts; PI-6 violation lifecycle facts; and DLQ lifecycle facts. It never
+receives task content, proof URLs, usernames, tokens, nonces or raw DLQ input.
+
+## Validation
+
+Requirements: Python 3.11+ and Node.js 20+.
 
 ```bash
 python3 -m pip install -r requirements-dev.txt
 make validate
 ```
 
-The command validates JSON, YAML, and HCL; tests events and operational records;
-checks privacy and ownership; verifies deterministic APISIX and Vault renders;
-executes n8n JavaScript fixtures; verifies ClickHouse/Grafana and hardening
-assets; scans the tree and Git history for credentials; and verifies the release
-manifest. Generated assets are reproducible from reviewed sources.
+Validated checkpoint results:
 
-To build the deterministic one-folder WSL archive after validation:
-
-```bash
-make release
-```
-
-For a Windows-laptop handoff, follow
-[`docs/wsl-vscode-setup.md`](docs/wsl-vscode-setup.md). The short access request
-for Friendy is in [`docs/message-to-friendy.md`](docs/message-to-friendy.md).
-
-## Configuration policy
-
-Copy `.env.example` only for local development. Values committed to Git are
-references and safe defaults—not credentials. Runtime secrets resolve from six
-isolated KV v2 objects below `kv/n8n/mattermost/checkin` and must never be
-stored in n8n workflow JSON, APISIX configuration, screenshots, logs, or CI
-variables in plaintext.
+- 171 automated tests passed.
+- 185 release files verified.
+- APISIX, Vault/Nomad and n8n renders are deterministic.
+- JSON, YAML, event, privacy, idempotency and security contracts pass.
+- GitHub validation and security workflows are green.
 
 ## Delivery status
 
-| Phase | State | Exit evidence |
-|---|---|---|
-| 1. Foundation and contracts | Locally validated | Contracts validate; ADRs and ownership boundaries recorded |
-| 2. APISIX gateway | Configuration prepared | Existing-platform route/plugin application and latency evidence remain |
-| 3. Vault security | Configuration prepared | Existing-platform policy bindings, live isolation, and rotation evidence remain |
-| 4. Compliance automation | Locally validated | Deterministic timezone, suppression, idempotency, escalation, and rollup tests pass |
-| 5–7. Reliability, analytics, hardening | Not accepted in this checkpoint | Prepared assets remain future work and require their own validation and approval |
+| Phase | Status |
+|---|---|
+| 1. Foundation and contracts | Locally validated |
+| 2. APISIX configuration | Locally validated; staging application pending |
+| 3. Vault/Nomad security | Locally validated; staging application pending |
+| 4. Compliance automation | Locally validated |
+| 5–7. DLQ, analytics and production hardening | Prepared; separate acceptance pending |
 
-“Locally validated” means reproducible tests passed without company credentials.
-It does not claim deployment to APISIX, Vault, Nomad, n8n, Baserow, Mattermost,
-or any production environment. Staging tests and named approvals remain open in
-[`release/production-readiness-checklist.md`](release/production-readiness-checklist.md).
-The detailed gates are in [`docs/phase-plan.md`](docs/phase-plan.md).
+This checkpoint does not claim live deployment. Staging application, integration
+with Part 2, latency/load evidence and security testing require the company
+access listed in [`docs/access-required.md`](docs/access-required.md).
+
+Detailed design: [`docs/architecture.md`](docs/architecture.md) · Phase gates:
+[`docs/phase-plan.md`](docs/phase-plan.md) · Runbooks:
+[`docs/runbooks`](docs/runbooks) · Repository map:
+[`docs/folder-structure.md`](docs/folder-structure.md)
