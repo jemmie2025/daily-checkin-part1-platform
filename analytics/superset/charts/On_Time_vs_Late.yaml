@@ -1,8 +1,0 @@
-slice_name: On-time vs Late by Pod
-description: Accepted check-ins split by SLA result.
-viz_type: echarts_timeseries_bar
-params: '{"adhoc_filters":[],"groupby":["pod_id"],"metrics":["SUM(on_time_count)","SUM(late_count)"],"orientation":"vertical","row_limit":100,"stack":"Stack","time_grain_sqla":"P1D","time_range":"Last week","viz_type":"echarts_timeseries_bar","x_axis":"cycle_date"}'
-cache_timeout: 300
-dataset_uuid: bbf089b7-d3b3-46f2-9515-f964278cdd2b
-uuid: 8a86c6ce-820d-4f5b-94d4-e5c527ec5b66
-version: 1.0.0

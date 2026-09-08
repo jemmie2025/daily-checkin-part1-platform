@@ -1,9 +1,9 @@
-.PHONY: bootstrap validate contracts gateway vault n8n superset hardening secrets test manifest render-apisix render-vault render-n8n render-superset manifest-write release
+.PHONY: bootstrap validate contracts gateway vault n8n grafana hardening secrets test manifest render-apisix render-vault render-n8n manifest-write release
 
 bootstrap:
 	python3 -m pip install -r requirements-dev.txt
 
-validate: contracts gateway vault n8n superset hardening secrets test manifest
+validate: contracts gateway vault n8n grafana hardening secrets test manifest
 
 contracts:
 	python3 scripts/validate_contracts.py
@@ -17,8 +17,8 @@ vault:
 n8n:
 	python3 scripts/render_n8n.py --check
 
-superset:
-	python3 scripts/package_superset.py --check
+grafana:
+	python3 -m json.tool analytics/grafana/daily-checkin-compliance.json >/dev/null
 
 hardening:
 	python3 scripts/validate_hardening.py
@@ -35,9 +35,6 @@ render-vault:
 render-n8n:
 	python3 scripts/render_n8n.py
 
-render-superset:
-	python3 scripts/package_superset.py
-
 manifest:
 	python3 scripts/release_manifest.py
 
@@ -45,7 +42,7 @@ manifest-write:
 	python3 scripts/release_manifest.py --write
 
 release: validate
-	python3 scripts/build_release.py --output ../Daily-Checkin-Part1-Phase1-4-v0.4.0.zip
+	python3 scripts/build_release.py --output ../Daily-Checkin-Part1-Configuration-v0.5.0.zip
 
 test:
 	python3 -m unittest discover -s tests -p 'test_*.py' -v

@@ -6,8 +6,25 @@ contracts.
 
 ## [Unreleased]
 
-Prepared Phase 5–7 assets remain outside the accepted v0.4.0 checkpoint and
+Prepared Phase 5–7 assets remain outside the accepted v0.5.0 checkpoint and
 must pass their separate company-environment gates before release.
+
+## [0.5.0] - 2026-09-07
+
+### Added
+
+- Machine-readable existing-platform connection topology.
+- Privacy-minimized ClickHouse violation and DLQ lifecycle fact contracts.
+- Importable six-panel Grafana dashboard for ClickHouse reporting views.
+- Full-history Gitleaks CI gate and manually authorised Strix security gate.
+
+### Changed
+
+- Delivery now configures company-managed APISIX, Consul, Nomad, Vault, Loki,
+  Grafana, and related services rather than proposing platform installation.
+- ClickHouse is the final analytics/audit destination and n8n is the lightweight
+  orchestration DAG.
+- Superset assets were removed following project direction.
 
 ## [0.4.0] - 2026-09-07
 
@@ -43,8 +60,7 @@ must pass their separate company-environment gates before release.
   30-day resolved retention markers.
 - ClickHouse event and expectation schemas, ingest/query deduplication,
   security-definer views, 24-month detail TTLs, and aggregate-only archival.
-- Deterministic Superset native-import package with two filters and six required
-  charts.
+- Importable Grafana dashboard with six required panels.
 - Five SLOs, Prometheus recording and alert rules, k6 plans, passive ZAP plan,
   incident/restore/rollout runbooks, acceptance matrices, and immutable release
   controls.
@@ -55,7 +71,7 @@ must pass their separate company-environment gates before release.
 
 - Expanded to six isolated workload identities and eight exact-path Vault KV v2
   objects, including dedicated analytics and shared event-ingestion boundaries.
-- Superset now reads reporting views only; raw and archive tables remain denied.
+- Grafana reads reporting views only; raw and archive tables remain denied.
 - Part 1/Part 2 integration requirements are published as versioned failure,
   replay, compliance, and event contracts.
 

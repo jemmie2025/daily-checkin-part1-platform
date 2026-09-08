@@ -2,9 +2,9 @@
 
 - Task: #5585 — Daily Check-in System
 - Workstream: Part 1 Platform
-- Version: 0.4.0
+- Version: 0.5.0
 - Validation date: 2026-09-07 UTC
-- Result: LOCAL IMPLEMENTATION PASS
+- Result: LOCAL CONFIGURATION PASS
 
 ## Command
 
@@ -14,16 +14,22 @@ make validate
 
 ## Verified outcomes
 
-- 42 JSON artifacts parsed successfully.
-- 25 YAML artifacts parsed successfully.
-- All 4 required `checkin.*` event examples passed contract validation.
-- All 8 operational record examples passed their logical schemas.
-- Privacy allowlists rejected raw tasks from telemetry.
-- Opened-event source and sub-two-second latency invariants passed.
-- PI-6 and DLQ identifiers were deterministic.
-- Part 1 and Part 2 write authorities remained mutually exclusive.
-- 167 automated tests passed with zero failures across the repository; only
-  Phase 1–4 is claimed by this checkpoint.
+- The machine-readable topology configures existing company platforms and does
+  not introduce a duplicate infrastructure stack.
+- Mattermost Open and Submit paths remain separate and analytics stays outside
+  the user-facing request path.
+- ClickHouse is the final privacy-safe analytics/audit sink; Grafana reads only
+  reviewed reporting views.
+- Violation and DLQ lifecycle fact contracts exclude raw tasks, proof links,
+  usernames, nonces, credentials, and verbatim failed submissions.
+- The DLQ preserves its durable first copy in n8n during a Baserow outage and
+  mirrors one deterministic operational row after recovery.
+- Gitleaks is an automatic full-history gate and Strix is restricted to a
+  manually authorised protected environment.
+- 47 JSON and 15 YAML files parsed successfully.
+- Four canonical check-in events and ten operational record contracts passed.
+- 171 automated tests passed with zero failures.
+- The immutable release manifest verified all 185 release files.
 
-The evidence contains no credentials, tokens, raw production submissions, or
-personal production data.
+No company service was changed and no live deployment is claimed. The evidence
+contains no credential, production submission, or personal production data.

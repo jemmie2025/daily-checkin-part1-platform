@@ -21,7 +21,7 @@ general-purpose configuration archive.
 3. Restore Baserow and validate deterministic IDs before enabling writers.
 4. Start Open, Submit, Compliance, DLQ, and Analytics tasks separately.
 5. Restore ClickHouse replicas and reapply views/access grants.
-6. Import the reviewed Superset asset and leave it unpublished.
+6. Import the reviewed Grafana dashboard and leave it private.
 7. Replay events by stable ID, reconcile source counts, then resume schedules.
 
 ## Pass criteria

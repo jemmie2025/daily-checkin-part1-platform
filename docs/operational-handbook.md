@@ -2,11 +2,11 @@
 
 | Responsibility | Primary guide |
 |---|---|
-| APISIX deployment | `docs/runbooks/apisix-deployment.md` |
-| Vault deployment and rotation | `docs/runbooks/vault-deployment-and-rotation.md` |
+| APISIX configuration | `docs/runbooks/apisix-deployment.md` |
+| Vault integration and rotation | `docs/runbooks/vault-deployment-and-rotation.md` |
 | Compliance and PI-6 | `docs/runbooks/compliance-operations.md` |
 | DLQ recovery | `docs/runbooks/dlq-operations.md` |
-| ClickHouse and Superset | `docs/runbooks/analytics-deployment.md` |
+| ClickHouse and Grafana | `docs/runbooks/analytics-deployment.md` |
 | Incident response | `docs/runbooks/incident-response.md` |
 | Backup and restore | `docs/runbooks/disaster-recovery.md` |
 | Progressive rollout | `docs/runbooks/production-rollout.md` |

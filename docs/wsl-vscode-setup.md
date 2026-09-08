@@ -5,7 +5,7 @@ scattering files. Use Ubuntu in WSL and VS Code with the WSL extension.
 
 ## 1. Move the ZIP to the Windows laptop
 
-Download `Daily-Checkin-Part1-Phase1-4-v0.4.0.zip` into the Windows Downloads
+Download `Daily-Checkin-Part1-Configuration-v0.5.0.zip` into the Windows Downloads
 folder. Email, WhatsApp Web, USB, or another approved transfer method is fine
 for this source-only ZIP. Do not use those channels later for company secrets or
 private evidence.
@@ -18,7 +18,7 @@ Open Ubuntu/WSL and run:
 sudo apt update
 sudo apt install -y unzip make python3 python3-venv
 mkdir -p "$HOME/projects"
-unzip -q /mnt/c/Users/godsw/Downloads/Daily-Checkin-Part1-Phase1-4-v0.4.0.zip -d "$HOME/projects"
+unzip -q /mnt/c/Users/godsw/Downloads/Daily-Checkin-Part1-Configuration-v0.5.0.zip -d "$HOME/projects"
 cd "$HOME/projects/daily-checkin-part1-platform"
 ```
 
@@ -56,7 +56,7 @@ git status 2>/dev/null || true
 find . -maxdepth 2 -type d | sort
 ```
 
-`VERSION` must print `0.4.0`. Do not copy `.env.example` into a populated `.env`
+`VERSION` must print `0.5.0`. Do not copy `.env.example` into a populated `.env`
 until the company endpoints and Vault delivery method are confirmed.
 
 ## 6. Initialize and push only after the official repository is supplied

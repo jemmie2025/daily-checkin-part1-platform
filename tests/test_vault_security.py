@@ -248,7 +248,6 @@ class SecretLeakGateTests(unittest.TestCase):
         self.assertTrue(findings)
         self.assertTrue(all(synthetic not in finding for finding in findings))
 
-
     def test_scanner_allows_k6_runtime_environment_reference(self) -> None:
         content = "token: __ENV.CHECKIN_TEST_COMMAND_TOKEN"
         self.assertEqual(scanner.scan_text(content, "fixture.js"), [])

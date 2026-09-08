@@ -83,6 +83,21 @@ def validate_test_plans() -> int:
     return 3
 
 
+def validate_security_gates() -> int:
+    gitleaks = (ROOT / ".gitleaks.toml").read_text(encoding="utf-8")
+    workflow = load_yaml(".github/workflows/security.yml")
+    strix = (ROOT / "security/strix/README.md").read_text(encoding="utf-8")
+    require("useDefault = true" in gitleaks, "Gitleaks defaults must remain enabled")
+    require(workflow["permissions"] == {"contents": "read"}, "security workflow permissions must be read-only")
+    checkout = workflow["jobs"]["gitleaks"]["steps"][0]
+    require(checkout["with"]["fetch-depth"] == 0, "Gitleaks requires complete history")
+    require(workflow["jobs"]["strix"]["if"] == "github.event_name == 'workflow_dispatch'", "Strix must be manual")
+    require(workflow["jobs"]["strix"]["environment"] == "staging-security", "Strix requires protected environment")
+    require("--non-interactive" in strix or " -n " in strix, "Strix must run non-interactively")
+    require("--scope-mode diff" in strix, "Strix repository scan must be diff scoped")
+    return 2
+
+
 def validate_runbooks() -> int:
     required = {
         "docs/runbooks/apisix-deployment.md": ("staging", "rollback"),
@@ -100,13 +115,21 @@ def validate_runbooks() -> int:
     return len(required)
 
 
-def validate_superset_assets() -> int:
-    dashboard = load_yaml("analytics/superset/dashboards/Daily_Checkin_Compliance.yaml")
-    require(dashboard["published"] is False, "dashboard must ship unpublished")
-    require(len(dashboard["charts"]) == 6, "dashboard must contain six charts")
-    json.loads(dashboard["position"])
-    json.loads(dashboard["metadata"])
-    return len(dashboard["charts"])
+def validate_grafana_assets() -> int:
+    dashboard = json.loads(
+        (ROOT / "analytics/grafana/daily-checkin-compliance.json").read_text(encoding="utf-8")
+    )
+    require(dashboard["id"] is None, "dashboard must be portable")
+    require(dashboard["editable"] is False, "dashboard must ship read-only")
+    require(len(dashboard["panels"]) == 6, "dashboard must contain six panels")
+    require(
+        dashboard["__inputs"][0]["pluginId"] == "grafana-clickhouse-datasource",
+        "dashboard must declare the ClickHouse datasource",
+    )
+    serialized = json.dumps(dashboard)
+    require("checkin_events_raw" not in serialized, "Grafana must not query raw events")
+    require("checkin_expectations_raw" not in serialized, "Grafana must not query raw expectations")
+    return len(dashboard["panels"])
 
 
 def main() -> int:
@@ -114,16 +137,18 @@ def main() -> int:
         slo_count, alert_count = validate_slos()
         metric_count = validate_telemetry()
         test_plan_count = validate_test_plans()
+        security_gate_count = validate_security_gates()
         runbook_count = validate_runbooks()
-        chart_count = validate_superset_assets()
+        panel_count = validate_grafana_assets()
     except (HardeningError, KeyError, TypeError, ValueError, yaml.YAMLError) as exc:
         print(f"FAIL: {exc}", file=sys.stderr)
         return 1
     print(f"PASS: {slo_count} SLOs map to recording rules and {alert_count} owned alerts")
     print(f"PASS: {metric_count} telemetry metrics obey privacy and cardinality controls")
     print(f"PASS: {test_plan_count} load/security plans enforce release thresholds")
+    print(f"PASS: {security_gate_count} repository security gates are least privilege")
     print(f"PASS: {runbook_count} operational runbooks contain required recovery controls")
-    print(f"PASS: {chart_count} Superset charts remain unpublished and structurally valid")
+    print(f"PASS: {panel_count} Grafana panels query ClickHouse reporting views only")
     return 0
 
 

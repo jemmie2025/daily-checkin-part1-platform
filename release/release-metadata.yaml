@@ -1,8 +1,8 @@
 release_schema: 1
-version: 0.4.0
+version: 0.5.0
 release_date: "2026-09-07"
 task: 5585
 scope: part-1-platform
 contract_version: 1
 dialog_version: checkin_v1
-status: phase-1-4-locally-validated-environment-evidence-required
+status: phase-1-configuration-revised-environment-review-required

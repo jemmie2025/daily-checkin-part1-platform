@@ -1,6 +1,7 @@
-# ClickHouse deployment
+# Existing ClickHouse integration
 
-Apply all four numbered files in order with a reviewed schema-owner identity.
+Apply all four numbered configuration files to the company-managed ClickHouse
+service in order with a reviewed schema-owner identity.
 The production DDL uses `ReplicatedReplacingMergeTree`, Keeper insert
 deduplication, stable `event_id` tokens, query-time deduplicated views, and a
 24-month detail TTL.
@@ -13,10 +14,10 @@ retention incident. Before first activation, backfill any already-old dates in
 an isolated change window and reconcile counts before allowing the raw TTL.
 
 The ingestion role can insert sanitized event/expectation rows and read only
-`event_id` plus `payload_hash` for conflict detection. Superset receives only
+`event_id` plus `payload_hash` for conflict detection. Grafana receives only
 the three security-definer reporting views and is explicitly denied both raw
 and archive tables. The schema-owner/definer must be a non-login deployment
 identity after installation. Neither raw table contains task text or proof URLs.
 
 Passwords are provisioned through the platform identity process and stored in
-Vault. They must never be added to these SQL files or Superset exports.
+Vault. They must never be added to SQL or Grafana dashboard files.

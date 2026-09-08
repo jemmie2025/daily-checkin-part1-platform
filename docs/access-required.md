@@ -34,7 +34,8 @@ first and production access only through the normal change process.
 | n8n execution API | Read-only credential scoped to failed Submit executions and permission to configure the error workflow | Reconcile durable executions into the DLQ without broad n8n administration |
 | ClickHouse staging | HTTPS endpoint, database, CA, migration/DDL role, scoped insert identity, reporting-view role, and system-table read needed for health checks | Install event tables/views, validate deduplication, retention, and access denial |
 | ClickHouse topology owner | Version, Keeper/replica details, backup target, and approval for refreshable aggregate views | Prove resilience and aggregate-only archival |
-| Superset staging | Dataset/dashboard import, edit, validate, and share permission; read-only ClickHouse reporting-role connection | Import and reconcile the compliance dashboard |
+| Existing Grafana | Dashboard import/edit permission and approved ClickHouse datasource mapping using the read-only reporting role | Import and reconcile the compliance dashboard |
+| Gitleaks/Strix | Approved scanner versions, Strix provider secret, authorised targets, runner with Docker, and finding-review owner | Run repository secret scanning and authorised security validation |
 | Prometheus/Alertmanager | Read plus reviewed rule deployment or an owner who can apply the supplied rules | Activate SLO recording and alert rules |
 | Security/load-test environment | Approved k6 and passive ZAP targets, source allowlist, test accounts, monitoring, and test window | Execute performance and security gates safely |
 | Backup/restore sandbox | Snapshot location, restore permission, and operator support | Run recovery and integrity drills |

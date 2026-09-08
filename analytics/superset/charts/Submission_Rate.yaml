@@ -1,8 +1,0 @@
-slice_name: Submission Rate
-description: Submitted check-ins divided by expected active staff after leave and holiday suppression.
-viz_type: big_number_total
-params: '{"adhoc_filters":[],"header_font_size":0.4,"metric":"submission_rate_percent","subheader":"Expected-roster denominator","time_range":"Last week","viz_type":"big_number_total","y_axis_format":".1f"}'
-cache_timeout: 300
-dataset_uuid: bbf089b7-d3b3-46f2-9515-f964278cdd2b
-uuid: e1113244-6d79-45f1-b7ee-721088eef6c7
-version: 1.0.0

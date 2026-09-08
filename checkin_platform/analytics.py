@@ -111,7 +111,7 @@ class EventLedger:
 def reconcile_metrics(
     events: Iterable[Mapping[str, Any]], expectations: Iterable[Mapping[str, Any]]
 ) -> list[dict[str, Any]]:
-    """Reproduce Superset daily metrics from deduplicated event fixtures."""
+    """Reproduce Grafana reporting metrics from deduplicated event fixtures."""
 
     unique_events: dict[str, Mapping[str, Any]] = {}
     for event in events:

@@ -9,8 +9,8 @@
 ## Commands
 
 ```bash
-python3 -m unittest tests.test_analytics tests.test_clickhouse_superset tests.test_n8n_code_runtime -v
-python3 scripts/package_superset.py --check
+python3 -m unittest tests.test_analytics tests.test_clickhouse_grafana tests.test_n8n_code_runtime -v
+make grafana
 ```
 
 ## Verified locally
@@ -25,14 +25,14 @@ python3 scripts/package_superset.py --check
   grants implement defense-in-depth deduplication and read boundaries.
 - Detail rows expire after 24 months; refreshable month-23 aggregates retain only
   pod/day metrics without personal identifiers or task content.
-- Superset reads three reporting views only, contains six required charts, ships
-  unpublished, and packages deterministically.
+- Grafana reads three reporting views only and contains six required panels in
+  a portable, read-only dashboard definition.
 - Event-normalizer JavaScript was executed under Node for valid, unauthorized,
   invalid-date, incomplete-outcome, private-field, and duplicate-rule cases.
 
 ## Deliberately not claimed
 
-No company ClickHouse cluster, Keeper, n8n endpoint, or Superset instance was
+No company ClickHouse cluster, Keeper, n8n endpoint, or Grafana instance was
 used. Replica health, live duplicate/conflict responses, TTL inspection, refresh
 health, raw-table denial, dashboard reconciliation, and usability checks in
 `docs/phase-6-acceptance.md` remain staging evidence gates.

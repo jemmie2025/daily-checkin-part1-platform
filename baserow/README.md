@@ -12,7 +12,7 @@ interface.
   workflows also filter before creation so normal retries avoid constraint
   conflicts.
 - `raw_submission` is restricted to DLQ operators and is never copied to logs,
-  ClickHouse, Superset, Redmine, or screenshots.
+  ClickHouse, Grafana, Redmine, or screenshots.
 - Resolved DLQ rows receive `retention_delete_after`; deletion is performed by
   the approved retention job after the 30-day recovery window.
 - Create a private grid view named `checkin_dlq_replay_pending` that includes

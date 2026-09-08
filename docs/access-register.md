@@ -21,7 +21,7 @@ The complete permission-by-permission request list is maintained in
 | Mattermost bot and lead-channel IDs | DMs and escalation | Phase 4 | Test-channel evidence |
 | ClickHouse endpoint/database/user | Event ingestion | Phase 6 | Redacted connection test |
 | ClickHouse refreshable-materialized-view support | Aggregate retention | Phase 6 | Version and `system.view_refreshes` status |
-| Superset workspace access | Dashboard import | Phase 6 | Dashboard screenshot |
+| Existing Grafana access | Dashboard import and ClickHouse datasource mapping | Phase 6 | Dashboard screenshot |
 | Nomad namespace, job IDs, and task names | JWT claim binding | Phase 3 | Redacted job plan |
 | Nomad JWKS URL and CA PEM | Vault JWT verification | Phase 3 | Sanitized auth config |
 | Scoped Vault policy/role deployer | Apply security resources | Phase 3 | Audit request IDs |

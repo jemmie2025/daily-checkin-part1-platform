@@ -1,0 +1,71 @@
+contract_version: 1
+task: 5585
+delivery_mode: existing_platform_configuration
+
+existing_services:
+  gateway: apisix
+  service_discovery: consul
+  scheduler: nomad
+  secret_store: vault
+  workflow_engine: n8n
+  operational_store: baserow
+  analytics_store: clickhouse
+  logs: loki
+  dashboards: grafana
+
+connections:
+  - id: mattermost_open
+    producer: mattermost
+    transport: https_post
+    gateway_path: /webhook/checkin/open
+    consumer: n8n_open_handler
+    owner: part_2
+    application_writes: forbidden
+
+  - id: mattermost_submit
+    producer: mattermost
+    transport: https_post
+    gateway_path: /webhook/checkin/submit
+    consumer: n8n_submit_handler
+    owner: part_2
+    operational_sink: baserow_checkins
+
+  - id: checkin_telemetry
+    producer: part_2_handlers_and_apisix_telemetry
+    transport: authenticated_https_json
+    contract: contracts/events/checkin-event.v1.schema.json
+    consumer: n8n_event_ingestion
+    analytical_sink: clickhouse
+    delivery: asynchronous_at_least_once
+
+  - id: compliance
+    producer: n8n_compliance
+    operational_sink: baserow_checkin_violations
+    analytical_contract: contracts/analytics/checkin-violation-fact.v1.schema.json
+    analytical_sink: clickhouse
+
+  - id: dead_letter
+    producer: n8n_submit_error
+    durable_first_copy: n8n_execution_store
+    operational_sink: baserow_checkin_dlq
+    analytical_contract: contracts/analytics/checkin-dlq-lifecycle.v1.schema.json
+    analytical_sink: clickhouse
+    raw_submission_in_clickhouse: forbidden
+
+  - id: reporting
+    producer: clickhouse_security_definer_views
+    consumer: grafana
+    access: read_only_reporting_views
+
+analytics:
+  final_sink: clickhouse
+  orchestrator: n8n
+  insert_format: JSONEachRow
+  direct_mattermost_to_clickhouse: false
+  request_path_blocks_on_analytics: false
+  forbidden_processors:
+    - airflow
+
+security_gates:
+  secret_scanning: gitleaks
+  authorised_active_testing: strix

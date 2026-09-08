@@ -15,10 +15,10 @@
 | 24-month detail retention | TTL tests | Pass |
 | Aggregate retention thereafter | Three day-23 refresh and reporting-union tests | Pass |
 | Expected-roster denominator | Metric reconciliation test | Pass |
-| Six required charts | Superset asset tests | Pass |
-| Read-only Superset identity | ClickHouse grant tests | Pass |
+| Six required panels | Grafana asset tests | Pass |
+| Read-only Grafana identity | ClickHouse grant tests | Pass |
 | Definer-view boundary | Explicit SQL security tests | Pass |
-| Deterministic dashboard archive | Byte-for-byte package test | Pass |
+| Portable dashboard definition | JSON structure and datasource-input test | Pass |
 
 ## Environment evidence still required
 
@@ -29,6 +29,6 @@
 | Conflict | Changed payload with same ID returns 409 and alerts |
 | Retention | `system.tables` TTL inspection with no payload values |
 | Aggregate refresh | Three healthy `system.view_refreshes` rows and reconciled archive fixture |
-| Role denial | Superset denied on both raw tables |
-| Dashboard reconciliation | All six chart totals match source fixtures |
+| Role denial | Grafana denied on both raw tables |
+| Dashboard reconciliation | All six panel totals match source fixtures |
 | Lead self-service | Approved lead opens filtered weekly view unaided |

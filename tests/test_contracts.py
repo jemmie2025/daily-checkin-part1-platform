@@ -140,6 +140,8 @@ class OwnershipTests(unittest.TestCase):
         part_2 = ownership["part_2_application"]
         self.assertIn("checkin_violations_writes", part_1["owns"])
         self.assertIn("checkin_dlq_writes", part_1["owns"])
+        self.assertIn("grafana_clickhouse_dashboard", part_1["owns"])
+        self.assertNotIn("superset_dashboard", part_1["owns"])
         self.assertIn("write_checkins", part_1["must_not"])
         self.assertIn("checkins_writes", part_2["owns"])
         self.assertIn("write_checkin_violations", part_2["must_not"])

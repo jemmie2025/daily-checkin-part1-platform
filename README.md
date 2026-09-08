@@ -4,10 +4,10 @@
 [![Phase](https://img.shields.io/badge/phases%201--4-locally%20validated-0969da)](docs/phase-plan.md)
 [![Secrets](https://img.shields.io/badge/secrets-Vault%20only-8250df)](SECURITY.md)
 
-Phase 1–4 implementation checkpoint for Task #5585: contracts, APISIX gateway,
-Vault runtime security, and compliance automation for the Mattermost Daily
-Check-in system. Local validation is complete; company-environment deployment
-and live evidence require the access listed in
+Configuration-first implementation for Task #5585: contracts and integration
+overlays for the company-managed APISIX, Vault, Nomad, Consul, n8n, Baserow,
+ClickHouse, Loki, and Grafana services. Company-environment application and live
+evidence require the access listed in
 [`docs/access-required.md`](docs/access-required.md).
 
 This repository is contract-first. Part 1 and Part 2 can be implemented and
@@ -18,11 +18,11 @@ edit the other workstream's implementation.
 
 Part 1 owns:
 
-- APISIX routing, allowlisting, per-user throttling, and request-size controls.
-- Vault policies and runtime secret delivery.
+- APISIX route/plugin configuration, allowlisting, per-user throttling, and request-size controls.
+- Vault/Nomad workload bindings and runtime secret delivery on the existing platform.
 - SLA reminders, violation detection, escalation, and weekly compliance rollups.
 - Durable retry, dead-letter capture, replay, and failed-submission notification.
-- ClickHouse event ingestion and Superset analytics.
+- Privacy-minimized ClickHouse ingestion and Grafana reporting configuration.
 - Operational telemetry, security controls, production tests, and runbooks.
 
 Part 1 does **not** write to `checkins`, open the Mattermost dialog, validate
@@ -44,7 +44,7 @@ the Part 2 boundary defined in [`contracts/ownership.yaml`](contracts/ownership.
 
 ## Architecture decisions already resolved
 
-Nine ambiguous areas in the master plan are resolved explicitly, including:
+Ten ambiguous areas in the master plan are resolved explicitly, including:
 
 1. Missing submissions exist only in `checkin_violations`; no synthetic
    `checkins` row is created.
@@ -62,6 +62,9 @@ Nine ambiguous areas in the master plan are resolved explicitly, including:
    pass mirrors failures that occurred while Baserow was unavailable.
 9. ClickHouse rejects conflicting event IDs, deduplicates at ingest and query
    time, expires detail after 24 months, and retains aggregate-only history.
+10. Existing company platforms are reused; n8n provides lightweight DAG
+    orchestration, ClickHouse is the analytics/audit destination, Grafana is the
+    reporting surface, and neither Airflow nor Superset is introduced.
 
 See [`docs/adr`](docs/adr) for the full rationale and consequences.
 The folder-by-folder ownership map is in
@@ -81,10 +84,10 @@ The folder-by-folder ownership map is in
 │   ├── events/             ClickHouse event schema and examples
 │   └── reliability/        Failure and replay contracts
 ├── n8n/                    Reviewed code, templates, and importable workflows
-├── analytics/              ClickHouse DDL and Superset native export
+├── analytics/              ClickHouse contracts and Grafana configuration
 ├── observability/          Metric contract, recording rules, and alerts
 ├── load/                   k6 performance and gateway-control tests
-├── security/               Passive ZAP scan plan
+├── security/               Gitleaks, Strix, and passive ZAP security gates
 ├── docs/                   Architecture, phases, ADRs, and runbooks
 │   └── adr/                Architecture decision records
 ├── vault/                  Generated policies, roles, inventory, and task fragments
@@ -106,7 +109,7 @@ make validate
 
 The command validates JSON, YAML, and HCL; tests events and operational records;
 checks privacy and ownership; verifies deterministic APISIX and Vault renders;
-executes n8n JavaScript fixtures; verifies ClickHouse/Superset and hardening
+executes n8n JavaScript fixtures; verifies ClickHouse/Grafana and hardening
 assets; scans the tree and Git history for credentials; and verifies the release
 manifest. Generated assets are reproducible from reviewed sources.
 
@@ -133,8 +136,8 @@ variables in plaintext.
 | Phase | State | Exit evidence |
 |---|---|---|
 | 1. Foundation and contracts | Locally validated | Contracts validate; ADRs and ownership boundaries recorded |
-| 2. APISIX gateway | Locally validated | Policy tests pass; staging deployment and latency evidence remain |
-| 3. Vault security | Locally validated | Policy/render tests pass; live isolation and rotation evidence remain |
+| 2. APISIX gateway | Configuration prepared | Existing-platform route/plugin application and latency evidence remain |
+| 3. Vault security | Configuration prepared | Existing-platform policy bindings, live isolation, and rotation evidence remain |
 | 4. Compliance automation | Locally validated | Deterministic timezone, suppression, idempotency, escalation, and rollup tests pass |
 | 5–7. Reliability, analytics, hardening | Not accepted in this checkpoint | Prepared assets remain future work and require their own validation and approval |
 

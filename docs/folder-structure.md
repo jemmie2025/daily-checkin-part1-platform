@@ -19,7 +19,9 @@ The archive extracts into one root folder: `daily-checkin-part1-platform`.
 | `evidence/` | Sanitized local validation records | Phases 1–4 claimed |
 | `scripts/` | Render, validate, deploy-dry-run, package, and WSL bootstrap tools | Validation support |
 | `release/` | Manifest, evidence index, metadata, and readiness checklist | Checkpoint control |
-| `analytics/`, `observability/`, `load/`, `security/` | Prepared Phase 5–7 assets | Not accepted in v0.4.0 |
+| `analytics/` | ClickHouse and existing-Grafana configuration | Prepared Phase 6 assets |
+| `observability/`, `load/` | Existing-platform monitoring and load-test configuration | Prepared Phase 7 assets |
+| `security/` | Gitleaks, Strix, and passive ZAP security gates | Phase 1 and prepared Phase 7 assets |
 
 Generated output belongs under `build/` and is excluded from Git and the release
 manifest. Real environment evidence belongs under `evidence/private/`, which is

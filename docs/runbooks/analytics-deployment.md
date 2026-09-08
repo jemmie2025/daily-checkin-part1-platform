@@ -1,15 +1,15 @@
-# ClickHouse and Superset Deployment Runbook
+# ClickHouse and Grafana Configuration Runbook
 
-## Deploy ClickHouse
+## Configure existing ClickHouse
 
 1. Confirm Keeper, replicas, TLS verification, backups, and the target database.
 2. Apply `analytics/clickhouse/001_schema.sql`, `002_views.sql`,
    `003_archive_rollups.sql`, and `004_access.sql` in that order using the
    schema-owner identity.
 3. Create separate credentials for `checkin_event_ingestor` and
-   `checkin_superset_reader`; store them in the approved secret systems.
+   `checkin_grafana_reader`; store them in the approved secret systems.
 4. Verify the ingestor can insert and can select only `event_id` plus
-   `payload_hash`. Verify the Superset identity can read only the three
+   `payload_hash`. Verify the Grafana identity can read only the three
    reporting views and is denied on raw and archive tables.
 5. Inspect both 24-month TTLs and monthly partitions.
 6. Inspect all three rows in `system.view_refreshes`, trigger an isolated manual
@@ -26,13 +26,13 @@
 4. Reuse an ID with changed content. Expect 409 and the conflict alert.
 5. Confirm no confidential field appears in table columns, logs, or errors.
 
-## Import Superset
+## Import into existing Grafana
 
-Run `make superset`, import the resulting ZIP, map the database connection to
-the approved secret-backed ClickHouse connection, and leave the dashboard
-unpublished. Reconcile every chart against the Python fixture calculation and
-the ClickHouse aggregate views. Publish only after counts match for three clean
-pilot days.
+Validate with `make grafana`, import
+`analytics/grafana/daily-checkin-compliance.json`, and map
+`DS_CHECKIN_CLICKHOUSE` to the approved secret-backed ClickHouse datasource.
+Keep the dashboard private until every panel reconciles with the ClickHouse
+reporting views for three clean pilot days.
 
 ## Rollback
 

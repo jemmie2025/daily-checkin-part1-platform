@@ -42,6 +42,14 @@ ClickHouse documentation on 2026-09-04:
 - [ClickHouse `CREATE VIEW`, definers, and SQL security](https://clickhouse.com/docs/en/sql-reference/statements/create/view)
 - [Refreshable materialized views](https://clickhouse.com/docs/en/materialized-view/refreshable-materialized-view)
 
+The security and reporting integrations were checked against their official
+documentation on 2026-09-07:
+
+- [Official Gitleaks repository](https://github.com/gitleaks/gitleaks)
+- [Official Gitleaks GitHub Action](https://github.com/gitleaks/gitleaks-action)
+- [Strix CI/CD integration](https://docs.strix.ai/integrations/ci-cd)
+- [Grafana ClickHouse datasource](https://grafana.com/grafana/plugins/grafana-clickhouse-datasource/)
+
 The n8n execution API capability and ClickHouse refreshable-view syntax must be
 confirmed against the exact company versions during staging. Those checks are
 release gates, not local assumptions.

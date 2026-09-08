@@ -27,6 +27,10 @@ RECORD_FIXTURES = {
         ROOT / "contracts" / "compliance" / "expected-checkin.v1.schema.json",
     ROOT / "contracts" / "apisix" / "examples" / "apisix-opened-access-log.json":
         ROOT / "contracts" / "apisix" / "apisix-access-log.v1.schema.json",
+    ROOT / "contracts" / "analytics" / "examples" / "checkin-violation-fact.json":
+        ROOT / "contracts" / "analytics" / "checkin-violation-fact.v1.schema.json",
+    ROOT / "contracts" / "analytics" / "examples" / "checkin-dlq-lifecycle.json":
+        ROOT / "contracts" / "analytics" / "checkin-dlq-lifecycle.v1.schema.json",
 }
 NESTED_FIXTURES = {
     ROOT / "contracts" / "compliance" / "examples" / "compliance-snapshot.json":
@@ -71,7 +75,7 @@ FORBIDDEN_TELEMETRY_FIELDS = {
     "token",
 }
 RULE_ID_PATTERN = re.compile(r"^(FMT-[1-8]|PI-[0-9]+)$")
-IGNORED_DIRECTORIES = {"build", "__pycache__", ".git", ".venv", "venv", "node_modules"}
+IGNORED_DIRECTORIES = {"build", "__pycache__", ".git"}
 
 
 class ContractError(ValueError):
@@ -286,7 +290,7 @@ def validate_flat_record(record: dict[str, Any], schema: dict[str, Any]) -> None
 def validate_repository_hygiene() -> int:
     checked = 0
     text_names = {"Makefile", "VERSION", ".gitignore", ".editorconfig", ".env.example"}
-    text_suffixes = {".hcl", ".md", ".json", ".yaml", ".yml", ".py", ".txt"}
+    text_suffixes = {".hcl", ".lua", ".md", ".json", ".yaml", ".yml", ".py", ".txt"}
     for path in sorted(ROOT.rglob("*")):
         if any(part in IGNORED_DIRECTORIES for part in path.parts):
             continue
@@ -294,6 +298,10 @@ def validate_repository_hygiene() -> int:
             continue
         content = path.read_text(encoding="utf-8")
         _require(content.endswith("\n"), f"{path.relative_to(ROOT)} must end with a newline")
+        _require(
+            not content.endswith("\n\n"),
+            f"{path.relative_to(ROOT)} must not end with a blank line",
+        )
         for line_number, line in enumerate(content.splitlines(), start=1):
             _require(line == line.rstrip(), f"trailing whitespace: {path.relative_to(ROOT)}:{line_number}")
         checked += 1

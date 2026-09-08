@@ -12,7 +12,7 @@
 ## Prepared but not accepted in this checkpoint
 
 - [ ] Phase 5 DLQ and reliability gate.
-- [ ] Phase 6 ClickHouse and Superset gate.
+- [ ] Phase 6 ClickHouse and Grafana gate.
 - [ ] Phase 7 production-hardening gate.
 
 ## Must be completed in company staging

@@ -1,0 +1,14 @@
+{
+  "fact_id": "9d3d7291-825c-4b05-9d11-b83b1e2ef011",
+  "fact_version": 1,
+  "occurred_at": "2026-09-07T17:00:00Z",
+  "violation_id": "viol_0d0d47e9b4e50bf57d8f21b12aef77ae",
+  "rule_id": "PI-6",
+  "user_id": "mm-user-014",
+  "pod_id": "nails-squad",
+  "cycle_date": "2026-09-07",
+  "checkin_type": "EOD",
+  "sla_code": "EOD-1700-WAT",
+  "status": "open",
+  "source_execution_id": "execution-compliance-7001"
+}

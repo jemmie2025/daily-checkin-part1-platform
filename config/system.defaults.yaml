@@ -35,6 +35,11 @@ compliance:
 
 analytics:
   event_contract: checkin-event.v1
+  violation_fact_contract: checkin-violation-fact.v1
+  dlq_lifecycle_contract: checkin-dlq-lifecycle.v1
+  orchestration: n8n_lightweight_dag
+  reporting: grafana_existing_instance
+  airflow_enabled: false
   event_detail_retention_months: 24
   aggregate_retention: aggregate_only_after_detail_ttl
   telemetry_contains_raw_input: false
@@ -64,7 +69,7 @@ required_external_values:
   - baserow_dlq_replay_view_id
   - n8n_submit_workflow_id
   - clickhouse_endpoint_database_and_user
-  - superset_workspace
+  - grafana_clickhouse_datasource_uid
   - approved_compliance_source_api
   - active_roster_and_pod_mapping
   - user_timezones

@@ -20,5 +20,5 @@ derives missing status from expected submissions minus accepted check-ins.
 
 - `checkins` remains an evidence table containing real user submissions only.
 - Missing status is auditable without fabricated rows.
-- Superset must combine expected-roster, check-in, and violation data when
+- ClickHouse reporting views must combine expected-roster, check-in, and violation data when
   calculating compliance.

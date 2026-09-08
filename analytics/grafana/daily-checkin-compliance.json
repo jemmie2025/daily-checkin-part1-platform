@@ -1,0 +1,75 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_CHECKIN_CLICKHOUSE",
+      "label": "Daily Check-in ClickHouse",
+      "type": "datasource",
+      "pluginId": "grafana-clickhouse-datasource",
+      "pluginName": "ClickHouse"
+    }
+  ],
+  "annotations": {"list": []},
+  "editable": false,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Submission Rate",
+      "type": "timeseries",
+      "datasource": {"type": "grafana-clickhouse-datasource", "uid": "${DS_CHECKIN_CLICKHOUSE}"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "targets": [{"refId": "A", "format": 1, "rawSql": "SELECT cycle_date AS time, pod_id, submission_rate FROM checkin_analytics.checkin_submission_metrics_reporting WHERE $__dateFilter(cycle_date) ORDER BY time"}]
+    },
+    {
+      "id": 2,
+      "title": "Median Submit Latency",
+      "type": "timeseries",
+      "datasource": {"type": "grafana-clickhouse-datasource", "uid": "${DS_CHECKIN_CLICKHOUSE}"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "targets": [{"refId": "A", "format": 1, "rawSql": "SELECT cycle_date AS time, pod_id, median_submit_latency_ms FROM checkin_analytics.checkin_submission_metrics_reporting WHERE $__dateFilter(cycle_date) ORDER BY time"}]
+    },
+    {
+      "id": 3,
+      "title": "Top Rejection Rules",
+      "type": "table",
+      "datasource": {"type": "grafana-clickhouse-datasource", "uid": "${DS_CHECKIN_CLICKHOUSE}"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "targets": [{"refId": "A", "format": 1, "rawSql": "SELECT rule_id, sum(rejection_count) AS rejection_count FROM checkin_analytics.checkin_rejection_rules_reporting WHERE $__dateFilter(cycle_date) GROUP BY rule_id ORDER BY rejection_count DESC LIMIT 10"}]
+    },
+    {
+      "id": 4,
+      "title": "Proof Attachment Rate",
+      "type": "timeseries",
+      "datasource": {"type": "grafana-clickhouse-datasource", "uid": "${DS_CHECKIN_CLICKHOUSE}"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "targets": [{"refId": "A", "format": 1, "rawSql": "SELECT cycle_date AS time, pod_id, proof_attach_rate FROM checkin_analytics.checkin_submission_metrics_reporting WHERE $__dateFilter(cycle_date) ORDER BY time"}]
+    },
+    {
+      "id": 5,
+      "title": "Blocked Task Trend",
+      "type": "timeseries",
+      "datasource": {"type": "grafana-clickhouse-datasource", "uid": "${DS_CHECKIN_CLICKHOUSE}"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+      "targets": [{"refId": "A", "format": 1, "rawSql": "SELECT cycle_date AS time, pod_id, blocked_task_count FROM checkin_analytics.checkin_submission_metrics_reporting WHERE $__dateFilter(cycle_date) ORDER BY time"}]
+    },
+    {
+      "id": 6,
+      "title": "On-time versus Late",
+      "type": "timeseries",
+      "datasource": {"type": "grafana-clickhouse-datasource", "uid": "${DS_CHECKIN_CLICKHOUSE}"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+      "targets": [{"refId": "A", "format": 1, "rawSql": "SELECT cycle_date AS time, pod_id, on_time_count, late_count FROM checkin_analytics.checkin_submission_metrics_reporting WHERE $__dateFilter(cycle_date) ORDER BY time"}]
+    }
+  ],
+  "refresh": "5m",
+  "schemaVersion": 39,
+  "tags": ["task-5585", "daily-checkin"],
+  "templating": {"list": []},
+  "time": {"from": "now-30d", "to": "now"},
+  "timezone": "utc",
+  "title": "Daily Check-in Compliance",
+  "uid": "daily-checkin-compliance-v1",
+  "version": 1
+}

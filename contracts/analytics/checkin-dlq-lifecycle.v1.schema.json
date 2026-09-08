@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://acumen.internal/contracts/checkin-dlq-lifecycle.v1.schema.json",
+  "title": "ClickHouse check-in DLQ lifecycle fact v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "fact_id",
+    "fact_version",
+    "occurred_at",
+    "dlq_id",
+    "correlation_id",
+    "user_id",
+    "pod_id",
+    "cycle_date",
+    "checkin_type",
+    "failure_stage",
+    "error_category",
+    "attempt_count",
+    "status",
+    "source_execution_id"
+  ],
+  "properties": {
+    "fact_id": {"type": "string", "format": "uuid"},
+    "fact_version": {"const": 1},
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "dlq_id": {"type": "string", "minLength": 8, "maxLength": 300},
+    "correlation_id": {"type": "string", "minLength": 8, "maxLength": 128},
+    "user_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "pod_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "cycle_date": {"type": "string", "format": "date"},
+    "checkin_type": {"type": "string", "enum": ["SOD", "EOD", "ADHOC"]},
+    "failure_stage": {
+      "type": "string",
+      "enum": ["baserow_checkins_write", "mattermost_canonical_post", "event_dispatch"]
+    },
+    "error_category": {
+      "type": "string",
+      "enum": ["timeout", "rate_limited", "unavailable", "authentication", "authorization", "invalid_response", "unknown"]
+    },
+    "attempt_count": {"type": "integer", "minimum": 3},
+    "status": {"type": "string", "enum": ["pending", "replaying", "resolved", "abandoned"]},
+    "source_execution_id": {"type": "string", "minLength": 1, "maxLength": 128}
+  }
+}

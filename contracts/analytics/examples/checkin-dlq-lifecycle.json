@@ -1,0 +1,16 @@
+{
+  "fact_id": "b50d319c-b306-412c-97cd-cf87d9db645c",
+  "fact_version": 1,
+  "occurred_at": "2026-09-07T16:04:21Z",
+  "dlq_id": "dlq_8e70e1aaeab57ed0c31d0551e2466c1e",
+  "correlation_id": "corr-20260907-00018",
+  "user_id": "mm-user-014",
+  "pod_id": "nails-squad",
+  "cycle_date": "2026-09-07",
+  "checkin_type": "EOD",
+  "failure_stage": "baserow_checkins_write",
+  "error_category": "unavailable",
+  "attempt_count": 3,
+  "status": "pending",
+  "source_execution_id": "execution-submit-8841"
+}

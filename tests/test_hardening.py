@@ -25,8 +25,9 @@ class SloTests(unittest.TestCase):
         self.assertEqual(validator.validate_slos()[0], 5)
         self.assertGreaterEqual(validator.validate_telemetry(), 9)
         self.assertEqual(validator.validate_test_plans(), 3)
+        self.assertEqual(validator.validate_security_gates(), 2)
         self.assertGreaterEqual(validator.validate_runbooks(), 8)
-        self.assertEqual(validator.validate_superset_assets(), 6)
+        self.assertEqual(validator.validate_grafana_assets(), 6)
 
     def test_every_slo_has_an_owned_alert_and_indicator(self) -> None:
         slos = yaml.safe_load((ROOT / "config/slos.yaml").read_text(encoding="utf-8"))["slos"]
@@ -98,9 +99,10 @@ class ReleaseControlTests(unittest.TestCase):
                 self.assertFalse(any("__pycache__" in name or name.startswith("daily-checkin-part1-platform/build/") for name in names))
 
     def test_github_actions_are_sha_pinned(self) -> None:
-        workflow = (ROOT / ".github/workflows/validate.yml").read_text(encoding="utf-8")
-        references = re.findall(r"uses:\s*([^\s]+)", workflow)
-        self.assertGreaterEqual(len(references), 2)
+        references = []
+        for path in (ROOT / ".github/workflows").glob("*.yml"):
+            references.extend(re.findall(r"uses:\s*([^\s]+)", path.read_text(encoding="utf-8")))
+        self.assertGreaterEqual(len(references), 4)
         for reference in references:
             self.assertRegex(reference, r"@[0-9a-f]{40}$")
 
@@ -114,11 +116,12 @@ class ReleaseControlTests(unittest.TestCase):
         environment = checklist.split("## Must be completed in company staging", maxsplit=1)[1]
         self.assertNotIn("- [x]", environment)
 
-    def test_dashboard_layout_json_is_valid(self) -> None:
-        dashboard = yaml.safe_load((ROOT / "analytics/superset/dashboards/Daily_Checkin_Compliance.yaml").read_text(encoding="utf-8"))
-        layout = json.loads(dashboard["position"])
-        self.assertEqual(layout["DASHBOARD_VERSION_KEY"], "v2")
-        self.assertEqual(len([key for key in layout if key.startswith("CHART-")]), 6)
+    def test_grafana_dashboard_layout_is_valid(self) -> None:
+        dashboard = json.loads(
+            (ROOT / "analytics/grafana/daily-checkin-compliance.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(dashboard["schemaVersion"], 39)
+        self.assertEqual(len(dashboard["panels"]), 6)
 
     def test_private_evidence_directory_is_ignored(self) -> None:
         gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")

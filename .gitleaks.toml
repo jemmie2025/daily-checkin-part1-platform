@@ -1,0 +1,11 @@
+title = "Task 5585 Gitleaks configuration"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Generated release archives and private evidence are not repository sources"
+paths = [
+  '''(^|/)build/''',
+  '''(^|/)evidence/private/'''
+]

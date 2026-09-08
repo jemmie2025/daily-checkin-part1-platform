@@ -1,8 +1,0 @@
-slice_name: Median Submit Latency
-description: Daily median submit-handler latency against the SLA timeline.
-viz_type: echarts_timeseries_line
-params: '{"adhoc_filters":[],"groupby":["pod_id"],"metrics":["median_submit_latency_ms"],"row_limit":10000,"show_legend":true,"time_grain_sqla":"P1D","time_range":"Last month","viz_type":"echarts_timeseries_line","x_axis":"cycle_date","y_axis_format":"SMART_NUMBER"}'
-cache_timeout: 300
-dataset_uuid: bbf089b7-d3b3-46f2-9515-f964278cdd2b
-uuid: 9dc245a6-ab23-4656-a751-ce9d7fb11ab8
-version: 1.0.0

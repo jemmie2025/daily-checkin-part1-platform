@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://acumen.internal/contracts/checkin-violation-fact.v1.schema.json",
+  "title": "ClickHouse check-in violation fact v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "fact_id",
+    "fact_version",
+    "occurred_at",
+    "violation_id",
+    "rule_id",
+    "user_id",
+    "pod_id",
+    "cycle_date",
+    "checkin_type",
+    "sla_code",
+    "status",
+    "source_execution_id"
+  ],
+  "properties": {
+    "fact_id": {"type": "string", "format": "uuid"},
+    "fact_version": {"const": 1},
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "violation_id": {"type": "string", "minLength": 8, "maxLength": 300},
+    "rule_id": {"const": "PI-6"},
+    "user_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "pod_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "cycle_date": {"type": "string", "format": "date"},
+    "checkin_type": {"const": "EOD"},
+    "sla_code": {"type": "string", "minLength": 1, "maxLength": 128},
+    "status": {"type": "string", "enum": ["open", "resolved", "waived"]},
+    "source_execution_id": {"type": "string", "minLength": 1, "maxLength": 128}
+  }
+}

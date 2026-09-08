@@ -1,8 +1,0 @@
-slice_name: Proof Attachment Rate
-description: Percentage of accepted submissions that include at least one validated proof URL.
-viz_type: big_number_total
-params: '{"adhoc_filters":[],"header_font_size":0.4,"metric":"proof_attach_rate_percent","subheader":"Accepted submissions","time_range":"Last week","viz_type":"big_number_total","y_axis_format":".1f"}'
-cache_timeout: 300
-dataset_uuid: bbf089b7-d3b3-46f2-9515-f964278cdd2b
-uuid: fe60317a-7fb2-4059-85c5-7ee143f468a9
-version: 1.0.0

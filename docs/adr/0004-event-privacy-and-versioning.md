@@ -18,4 +18,4 @@ content, proof links, usernames, state, nonces, and tokens are forbidden.
 
 - Event producers and ingestion validate against the same schema.
 - Optional additive fields are allowed only after the schema is updated first.
-- Dashboards use stable machine fields and avoid unnecessary personal data.
+- Grafana dashboards use stable ClickHouse reporting fields and avoid unnecessary personal data.
